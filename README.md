@@ -1,4 +1,4 @@
-# IGZ Hydro Flask Marketplace Listing Tool
+# Marketplace Listing Tool
 
 Turns one raw product spreadsheet into ready-to-post files for **Shopee, Lazada,
 TikTok Shop, and Zalora Indonesia** — matching the column layouts of your
