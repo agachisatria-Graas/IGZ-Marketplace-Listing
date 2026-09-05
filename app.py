@@ -7,8 +7,9 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 
 import mapping
+import image_combiner
 
-st.set_page_config(page_title="Marketplace Listing Tool", layout="wide")
+st.set_page_config(page_title="Agachi's Tools", layout="wide")
 
 RAW_COLUMNS = [
     "parent_id", "sku", "title", "main_description", "long_description",
@@ -128,127 +129,254 @@ def file_bytes(path):
         return f.read()
 
 
-st.title("Marketplace Listing Tool")
-st.caption("Shopee · Lazada · TikTok Shop · Zalora Indonesia")
-st.write(
-    "Upload one raw data file with all your items and variants, and get back "
-    "ready-to-post files formatted for each marketplace."
-)
-
-with st.expander("📋 First time here? Get the templates", expanded=False):
+def render_listing_tool():
+    st.title("Marketplace Listing Tool")
+    st.caption("Shopee · Lazada · TikTok Shop · Zalora Indonesia")
     st.write(
-        "1. Download **raw_data_template.xlsx**, fill in one row per SKU (each "
-        "variant of a product is its own row, sharing the same **Parent SKU**)."
-    )
-    st.download_button(
-        "Download raw_data_template.xlsx",
-        data=file_bytes("raw_data_template.xlsx"),
-        file_name="raw_data_template.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
-    st.write(
-        "2. Download **category_mapping_template.xlsx** — this is how category IDs "
-        "get filled in; there's no manual category ID field in the raw data file "
-        "anymore. It has one sheet per marketplace — add a row per keyword: if that "
-        "keyword appears anywhere in an item's Title (and Gender matches, if given), "
-        "that category ID gets filled in automatically. You can also upload your own "
-        "existing category mapping file directly, as long as it follows this same "
-        "Gender / Keyword in Title / Category ID layout, one sheet per marketplace."
-    )
-    st.download_button(
-        "Download category_mapping_template.xlsx",
-        data=file_bytes("category_mapping_template.xlsx"),
-        file_name="category_mapping_template.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Upload one raw data file with all your items and variants, and get back "
+        "ready-to-post files formatted for each marketplace."
     )
 
-col1, col2 = st.columns(2)
-with col1:
-    uploaded = st.file_uploader("Upload your filled-in raw data file (.xlsx)", type=["xlsx"])
-with col2:
-    uploaded_map = st.file_uploader(
-        "Upload category mapping file (.xlsx) — needed to fill in Category IDs",
-        type=["xlsx"],
-    )
+    with st.expander("📋 First time here? Get the templates", expanded=False):
+        st.write(
+            "1. Download **raw_data_template.xlsx**, fill in one row per SKU (each "
+            "variant of a product is its own row, sharing the same **Parent SKU**)."
+        )
+        st.download_button(
+            "Download raw_data_template.xlsx",
+            data=file_bytes("raw_data_template.xlsx"),
+            file_name="raw_data_template.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        st.write(
+            "2. Download **category_mapping_template.xlsx** — this is how category IDs "
+            "get filled in; there's no manual category ID field in the raw data file "
+            "anymore. It has one sheet per marketplace — add a row per keyword: if that "
+            "keyword appears anywhere in an item's Title (and Gender matches, if given), "
+            "that category ID gets filled in automatically. You can also upload your own "
+            "existing category mapping file directly, as long as it follows this same "
+            "Gender / Keyword in Title / Category ID layout, one sheet per marketplace."
+        )
+        st.download_button(
+            "Download category_mapping_template.xlsx",
+            data=file_bytes("category_mapping_template.xlsx"),
+            file_name="category_mapping_template.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
 
-if uploaded is not None:
-    try:
-        raw_rows = load_raw_file(uploaded)
-    except Exception as e:
-        st.error(f"Couldn't read the raw data file: {e}")
-        st.stop()
+    col1, col2 = st.columns(2)
+    with col1:
+        uploaded = st.file_uploader("Upload your filled-in raw data file (.xlsx)", type=["xlsx"])
+    with col2:
+        uploaded_map = st.file_uploader(
+            "Upload category mapping file (.xlsx) — needed to fill in Category IDs",
+            type=["xlsx"],
+        )
 
-    if not raw_rows:
-        st.warning("No data rows found. Make sure Seller SKUs are filled in.")
-        st.stop()
-
-    if uploaded_map is not None:
+    if uploaded is not None:
         try:
-            category_sheets, matched_sheets = load_category_mapping_workbook(uploaded_map)
+            raw_rows = load_raw_file(uploaded)
         except Exception as e:
-            st.error(f"Couldn't read the category mapping file: {e}")
+            st.error(f"Couldn't read the raw data file: {e}")
             st.stop()
-        total_keywords = sum(len(v) for v in category_sheets.values())
-        st.success(
-            f"Loaded {total_keywords} keyword mapping(s) from sheet(s): "
-            + ", ".join(matched_sheets)
-        )
-        raw_rows = mapping.apply_title_category_mapping(raw_rows, category_sheets)
-        unmatched = {p: [] for p in mapping.PLATFORM_CATEGORY_FIELD}
-        for r in raw_rows:
-            for p, f in mapping.PLATFORM_CATEGORY_FIELD.items():
-                if not r.get(f):
-                    unmatched[p].append(r.get("sku"))
-        for p, skus in unmatched.items():
-            if skus:
-                st.warning(
-                    f"No {PLATFORM_LABELS[p]} category match (no keyword in "
-                    f"category_mapping_template.xlsx matched these Titles, so their "
-                    f"Category ID is blank): " + ", ".join(str(s) for s in skus)
+
+        if not raw_rows:
+            st.warning("No data rows found. Make sure Seller SKUs are filled in.")
+            st.stop()
+
+        if uploaded_map is not None:
+            try:
+                category_sheets, matched_sheets = load_category_mapping_workbook(uploaded_map)
+            except Exception as e:
+                st.error(f"Couldn't read the category mapping file: {e}")
+                st.stop()
+            total_keywords = sum(len(v) for v in category_sheets.values())
+            st.success(
+                f"Loaded {total_keywords} keyword mapping(s) from sheet(s): "
+                + ", ".join(matched_sheets)
+            )
+            raw_rows = mapping.apply_title_category_mapping(raw_rows, category_sheets)
+            unmatched = {p: [] for p in mapping.PLATFORM_CATEGORY_FIELD}
+            for r in raw_rows:
+                for p, f in mapping.PLATFORM_CATEGORY_FIELD.items():
+                    if not r.get(f):
+                        unmatched[p].append(r.get("sku"))
+            for p, skus in unmatched.items():
+                if skus:
+                    st.warning(
+                        f"No {PLATFORM_LABELS[p]} category match (no keyword in "
+                        f"category_mapping_template.xlsx matched these Titles, so their "
+                        f"Category ID is blank): " + ", ".join(str(s) for s in skus)
+                    )
+        else:
+            st.warning(
+                "No category mapping file uploaded — every Category ID field will be "
+                "blank in the output. Upload one to auto-fill them."
+            )
+
+        st.success(f"Loaded {len(raw_rows)} SKU row(s) across "
+                   f"{len(mapping.group_rows_by_parent(raw_rows))} parent product(s).")
+
+        st.subheader("Preview & download")
+        tabs = st.tabs([PLATFORM_LABELS[p] for p in ["shopee", "lazada", "tiktok", "zalora"]])
+        outputs = {}
+
+        for tab, platform in zip(tabs, ["shopee", "lazada", "tiktok", "zalora"]):
+            with tab:
+                headers, out_rows = mapping.build_platform_rows(platform, raw_rows)
+                df_out = pd.DataFrame(out_rows, columns=headers)
+                outputs[platform] = (headers, out_rows)
+                st.dataframe(df_out, use_container_width=True, height=350)
+                file_data = rows_to_xlsx_bytes(platform, headers, out_rows)
+                st.download_button(
+                    f"Download {PLATFORM_LABELS[platform]} file",
+                    data=file_data,
+                    file_name=f"{PLATFORM_LABELS[platform].replace(' ', '_')}_Listing_File.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key=f"dl_{platform}",
                 )
-    else:
-        st.warning(
-            "No category mapping file uploaded — every Category ID field will be "
-            "blank in the output. Upload one to auto-fill them."
+
+        # bundle all four into one zip too
+        zip_buf = io.BytesIO()
+        with zipfile.ZipFile(zip_buf, "w") as zf:
+            for platform, (headers, out_rows) in outputs.items():
+                zf.writestr(
+                    f"{PLATFORM_LABELS[platform].replace(' ', '_')}_Listing_File.xlsx",
+                    rows_to_xlsx_bytes(platform, headers, out_rows),
+                )
+        zip_buf.seek(0)
+        st.divider()
+        st.download_button(
+            "⬇️ Download all 4 files as ZIP",
+            data=zip_buf.read(),
+            file_name="marketplace_listing_files.zip",
+            mime="application/zip",
         )
+    else:
+        st.info("Upload a filled-in raw data file to get started.")
 
-    st.success(f"Loaded {len(raw_rows)} SKU row(s) across "
-               f"{len(mapping.group_rows_by_parent(raw_rows))} parent product(s).")
 
-    st.subheader("Preview & download")
-    tabs = st.tabs([PLATFORM_LABELS[p] for p in ["shopee", "lazada", "tiktok", "zalora"]])
-    outputs = {}
-
-    for tab, platform in zip(tabs, ["shopee", "lazada", "tiktok", "zalora"]):
-        with tab:
-            headers, out_rows = mapping.build_platform_rows(platform, raw_rows)
-            df_out = pd.DataFrame(out_rows, columns=headers)
-            outputs[platform] = (headers, out_rows)
-            st.dataframe(df_out, use_container_width=True, height=350)
-            file_data = rows_to_xlsx_bytes(platform, headers, out_rows)
-            st.download_button(
-                f"Download {PLATFORM_LABELS[platform]} file",
-                data=file_data,
-                file_name=f"{PLATFORM_LABELS[platform].replace(' ', '_')}_Listing_File.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key=f"dl_{platform}",
-            )
-
-    # bundle all four into one zip too
-    zip_buf = io.BytesIO()
-    with zipfile.ZipFile(zip_buf, "w") as zf:
-        for platform, (headers, out_rows) in outputs.items():
-            zf.writestr(
-                f"{PLATFORM_LABELS[platform].replace(' ', '_')}_Listing_File.xlsx",
-                rows_to_xlsx_bytes(platform, headers, out_rows),
-            )
-    zip_buf.seek(0)
-    st.divider()
-    st.download_button(
-        "⬇️ Download all 4 files as ZIP",
-        data=zip_buf.read(),
-        file_name="marketplace_listing_files.zip",
-        mime="application/zip",
+def render_image_combiner():
+    st.title("Image Link Combiner")
+    st.caption("Not connected to the marketplace listing tool — just a standalone helper.")
+    st.write(
+        "Combines images into one `\" ; \"`-separated string per SKU, in the "
+        "right order — ready to paste into the listing tool's Parent Images / "
+        "Zalora Images columns, or anywhere else you need it."
     )
-else:
-    st.info("Upload a filled-in raw data file to get started.")
+
+    mode = st.radio(
+        "What does your source data look like?",
+        [
+            "A file with a File Name column (e.g. SKU_1.jpg) and a separate Image URL column",
+            "Paste a list of URLs where the SKU_N pattern is IN the URL itself",
+        ],
+    )
+
+    if mode.startswith("A file"):
+        st.write(
+            "The order comes from the number in **File Name** (e.g. `_1`, `_2`, "
+            "`_3`) — the **Image URL** column can be anything, even random "
+            "upload links with no SKU in them at all."
+        )
+        uploaded_media_file = st.file_uploader(
+            "Upload your file (.xlsx or .csv)", type=["xlsx", "csv"]
+        )
+        if uploaded_media_file is not None:
+            try:
+                if uploaded_media_file.name.lower().endswith(".csv"):
+                    df_media = pd.read_csv(uploaded_media_file)
+                else:
+                    df_media = pd.read_excel(uploaded_media_file)
+            except Exception as e:
+                st.error(f"Couldn't read that file: {e}")
+                st.stop()
+
+            cols = list(df_media.columns)
+
+            def guess(keywords, exclude=()):
+                for c in cols:
+                    cl = str(c).lower()
+                    if any(k in cl for k in keywords) and not any(x in cl for x in exclude):
+                        return c
+                return cols[0]
+
+            guessed_filename_col = guess(["file", "name"], exclude=["date"])
+            guessed_url_col = guess(["image", "url", "link"])
+
+            col1, col2 = st.columns(2)
+            with col1:
+                filename_col = st.selectbox(
+                    "Which column has the File Name (e.g. SKU_1.jpg)?",
+                    cols, index=cols.index(guessed_filename_col),
+                )
+            with col2:
+                url_col = st.selectbox(
+                    "Which column has the Image URL to use?",
+                    cols, index=cols.index(guessed_url_col),
+                )
+
+            st.dataframe(df_media[[filename_col, url_col]].head(10), use_container_width=True)
+            pairs = list(zip(df_media[filename_col], df_media[url_col]))
+            combined, unmatched = image_combiner.group_and_combine_from_pairs(pairs)
+            _render_combined_result(combined, unmatched, unmatched_label="File Name(s)")
+        else:
+            st.info("Upload a file to get started.")
+
+    else:
+        pasted = st.text_area(
+            "Paste image URLs, one per line",
+            height=220,
+            placeholder="https://example.com/DSM427123Y-M_1.jpg\n"
+                        "https://example.com/DSM427123Y-M_2.jpg\n"
+                        "https://example.com/HF-TUM-BUR_1.jpg",
+        )
+        if pasted.strip():
+            urls = [line for line in pasted.splitlines() if line.strip()]
+            combined, unmatched = image_combiner.group_and_combine(urls)
+            _render_combined_result(combined, unmatched, unmatched_label="URL(s)")
+        else:
+            st.info("Paste some URLs to get started.")
+
+
+def _render_combined_result(combined, unmatched, unmatched_label="item(s)"):
+    if combined:
+        st.success(f"Combined images for {len(combined)} SKU(s).")
+        df_result = pd.DataFrame(
+            [{"SKU": sku, "Combined Images": joined} for sku, joined in combined.items()]
+        )
+        st.dataframe(df_result, use_container_width=True, height=300)
+
+        buf = io.BytesIO()
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Combined Images"
+        ws.cell(row=1, column=1, value="SKU").font = Font(bold=True)
+        ws.cell(row=1, column=2, value="Combined Images").font = Font(bold=True)
+        for i, (sku, joined) in enumerate(combined.items(), start=2):
+            ws.cell(row=i, column=1, value=sku)
+            ws.cell(row=i, column=2, value=joined)
+        ws.column_dimensions["A"].width = 24
+        ws.column_dimensions["B"].width = 80
+        wb.save(buf)
+        buf.seek(0)
+        st.download_button(
+            "Download combined_images.xlsx",
+            data=buf.read(),
+            file_name="combined_images.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+    else:
+        st.warning("None of the rows matched the expected `SKU_N.ext` pattern.")
+
+    if unmatched:
+        with st.expander(f"⚠️ {len(unmatched)} {unmatched_label} didn't match the SKU_N.ext pattern"):
+            for u in unmatched:
+                st.write(u)
+
+
+tool_tab1, tool_tab2 = st.tabs(["📦 Marketplace Listing Tool", "🖼️ Image Link Combiner"])
+with tool_tab1:
+    render_listing_tool()
+with tool_tab2:
+    render_image_combiner()
