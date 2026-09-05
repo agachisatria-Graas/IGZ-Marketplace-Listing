@@ -130,7 +130,7 @@ def file_bytes(path):
 
 
 def render_listing_tool():
-    st.title("Marketplace Listing Tool")
+    st.title("Hydro Flask Marketplace Listing Tool")
     st.caption("Shopee · Lazada · TikTok Shop · Zalora Indonesia")
     st.write(
         "Upload one raw data file with all your items and variants, and get back "
@@ -432,7 +432,7 @@ def _render_combined_result(combined, unmatched, unmatched_label="item(s)"):
                 st.write(u)
 
 
-tool_tab1, tool_tab2 = st.tabs(["📦 Marketplace Listing Tool", "🖼️ Image Link Combiner"])
+tool_tab1, tool_tab2 = st.tabs(["📦 Hydro Flask Marketplace Listing Tool", "🖼️ Image Link Combiner"])
 with tool_tab1:
     render_listing_tool()
 with tool_tab2:
