@@ -143,8 +143,8 @@ HERSCHEL_RAW_COLUMNS = [
     "price", "stock", "parent_images", "variant_images", "weight_kg", "length_cm",
     "width_cm", "height_cm", "product_type", "specific_category", "gender",
     "material", "shopee_shipping_service", "shopee_item_specifications",
-    "lazada_item_specifications", "tiktok_item_specifications",
-    "zalora_subcat_type", "zalora_color_family", "zalora_color", "zalora_images",
+    "lazada_item_specifications", "tiktok_item_specifications", "season", "year",
+    "zalora_color", "zalora_images",
 ]
 
 HERSCHEL_RAW_LABEL_TO_KEY = {
@@ -164,8 +164,7 @@ HERSCHEL_RAW_LABEL_TO_KEY = {
     "Shopee Item Specifications": "shopee_item_specifications",
     "Lazada Item Specifications": "lazada_item_specifications",
     "TikTok Item Specifications": "tiktok_item_specifications",
-    "Zalora Sub Cat Type": "zalora_subcat_type",
-    "Zalora Color Family": "zalora_color_family", "Zalora Color": "zalora_color",
+    "Season": "season", "Year": "year", "Zalora Color": "zalora_color",
     "Zalora Images": "zalora_images",
 }
 
@@ -255,6 +254,16 @@ def render_herschel_listing_tool():
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key="dl_herschel_category_template",
         )
+        st.write(
+            "Zalora's **ColorFamily** and **SubCatType** are fully automatic — "
+            "no field to fill in for either. ColorFamily is classified from "
+            "the first Zalora image's dominant color (falling back to a "
+            "keyword match on the Color name if no image is available), and "
+            "SubCatType is looked up from the PrimaryCategory your category "
+            "mapping resolves to. **Weight** can be pasted straight from a "
+            "spec sheet showing both units, e.g. `1.10 lb / 0.5` — the tool "
+            "automatically takes the number after the `/` as kilograms."
+        )
 
     col1, col2 = st.columns(2)
     with col1:
@@ -313,6 +322,18 @@ def render_herschel_listing_tool():
 
     st.success(f"Loaded {len(raw_rows)} SKU row(s) across "
                f"{len(herschel_mapping.group_rows_by_parent(raw_rows))} parent product(s).")
+
+    with st.spinner("Classifying Zalora color families from images..."):
+        raw_rows, unresolved_colors = herschel_mapping.resolve_color_families(raw_rows)
+    if unresolved_colors:
+        with st.expander(f"⚠️ Zalora ColorFamily couldn't be determined for {len(unresolved_colors)} SKU(s) — left blank"):
+            st.write(
+                "No Zalora image could be fetched/classified, and the Color "
+                "name didn't match any recognizable keyword either. Fill "
+                "these in by hand in the downloaded file if needed:"
+            )
+            for s in unresolved_colors:
+                st.write(s)
 
     st.subheader("Preview & download")
     tabs = st.tabs([PLATFORM_LABELS[p] for p in ["shopee", "lazada", "tiktok", "zalora"]])

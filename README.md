@@ -48,13 +48,49 @@ TikTok Shop, and Zalora Indonesia** — matching the column layouts of your
 - **Description**: combines **three** fields — Main Description, Main
   Description 2, and Measurement — joined with line breaks, instead of
   Hydro Flask's two-field Main+Long combo.
+- **Weight**: paste straight from a spec sheet showing both units, e.g.
+  `1.10 lb / 0.5` — the tool takes the number **after** the `/` as
+  kilograms (that's the kg figure; before the slash is lb). A plain number
+  with no slash works fine too.
+- **Output headers match Agachi's real Herschel templates exactly** —
+  Shopee (50 cols), Lazada (65 cols, including the English/Tax
+  Class/Model/Template Attribute fields), TikTok (41 cols, in Indonesian,
+  matching the real category-attribute columns like Pola/Gaya/Bahan), and
+  Zalora (68 cols). These are separate header layouts from Hydro Flask's,
+  defined independently in `herschel_mapping.py`.
+- **TikTok Item Specifications**: a `Key=Value` pair whose key matches one
+  of TikTok's named attribute columns (Jenis Kulit, Pola, Acara, Gaya,
+  Instruksi Mencuci, Tipe Pengencang, Tipe Tas, Fitur, Bahan) — case
+  insensitive — lands directly in that column. `Bahan` (Material) is also
+  auto-filled from the Material column's extracted keyword unless you
+  override it explicitly. Unmatched keys are dropped for TikTok (there's no
+  generic overflow column in the real template).
+- **Zalora ColorFamily**: fully automatic, no field to fill in. The tool
+  fetches the **first Zalora Image** and classifies its dominant color
+  against Zalora's 18 valid families (black, grey, white, red, pink,
+  orange, yellow, green, blue, purple, turquoise, bronze, lilac purple,
+  silver, beige, gold, navy, brown) by nearest color match. If no image is
+  available or the fetch fails, it falls back to a keyword match on the
+  **Zalora Color** name (e.g. "Navy" → navy). This matters because many
+  real color names are non-literal (e.g. "Enderman", "Creeper", "Pink
+  Sheep") — keyword matching alone only catches about half of those
+  correctly, so the image is the primary signal. Any SKU where neither
+  method resolves a family is flagged in the app and left blank for manual
+  entry.
+- **Zalora SubCatType**: also fully automatic, looked up from a fixed
+  PrimaryCategory → SubCatType table (`PRIMARY_CATEGORY_TO_SUBCAT` in
+  `herschel_mapping.py`) extracted from Agachi's real Zalora listing file.
+  If a new PrimaryCategory shows up that isn't in that table yet, SubCatType
+  comes back blank — extend the dict with the new pair when that happens.
+- **Season / Year**: simple pass-through raw columns, used only by Zalora's
+  output.
 
 ## Setup (one time)
 
 You need Python 3.9+ installed. Then, in this folder:
 
 ```bash
-pip install streamlit pandas openpyxl
+pip install streamlit pandas openpyxl requests Pillow
 ```
 
 ## Running the tool
