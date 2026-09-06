@@ -6,17 +6,48 @@ TikTok Shop, and Zalora Indonesia** — matching the column layouts of your
 
 ## Files
 
-- `app.py` — the Streamlit app itself, now with **two tabs**: the Marketplace
-  Listing Tool and a standalone Image Link Combiner (unrelated to each other,
-  just hosted at the same link).
-- `mapping.py` — the listing tool's conversion logic (raw row → each
+- `app.py` — the Streamlit app itself, with **three tabs**: the Hydro Flask
+  Marketplace Listing Tool, a standalone Image Link Combiner, and the
+  Herschel Marketplace Listing Tool (all independent of each other, just
+  hosted at the same link).
+- `mapping.py` — Hydro Flask's conversion logic (raw row → each
   marketplace's columns)
-- `image_combiner.py` — the Image Link Combiner's logic: groups image URLs by
-  the SKU in their filename (`SKU_1.jpg`, `SKU_2.jpg`, ...) and joins them with
-  `" ; "` per SKU
-- `raw_data_template.xlsx` — blank template for you to fill in your item data
-- `category_mapping_template.xlsx` — blank template for auto category-ID matching
-- `build_template.py` — regenerates both templates if you want to tweak them
+- `herschel_mapping.py` — Herschel's conversion logic — a fully separate
+  module with its own category-matching rule (exact match on Product Type +
+  Specific Category + Gender) and material-extraction logic, though it
+  reuses Hydro Flask's brand-agnostic helpers (image joining, HTML
+  conversion, output header layouts) rather than duplicating them
+- `image_combiner.py` — the Image Link Combiner's logic
+- `raw_data_template.xlsx` / `category_mapping_template.xlsx` — Hydro
+  Flask's input templates
+- `herschel_raw_data_template.xlsx` / `herschel_category_mapping_template.xlsx`
+  — Herschel's input templates (you can also upload your real
+  `IGZ_Herschel_category_sheet.xlsx`-style file directly instead of the blank
+  template)
+- `build_template.py` / `build_herschel_template.py` — regenerate the
+  respective pair of templates if you want to tweak them
+
+## Herschel tool — how it differs from Hydro Flask's
+
+- **Category ID**: resolved by an **exact match** on Product Type + Specific
+  Category + Gender\* (e.g. `BAGS` + `BACKPACKS` + `US`) against the category
+  mapping file — not a keyword-in-title search. No manual fallback field
+  exists; an unmatched combination leaves that platform's Category ID blank.
+- **Gender\* code**: also translated into Zalora's own Gender field —
+  `US`→`Men`, `WN`→`Women`, `UK`→`Kids`.
+- **Material**: type (or paste) a free-text list into the **Material**
+  column — the tool scans it line by line and picks out the first
+  recognizable material keyword (Polyester, Leather, Nylon, Cotton, Canvas,
+  Suede, Wool, Rubber, Silicone, Stainless Steel, etc.) to use in Shopee,
+  Lazada, and Zalora's Material fields.
+- **Item Specifications order**: Shopee is always `Brand=Herschel` then
+  `Material=<extracted>`, with anything in **Shopee Item Specifications**
+  appended after. Lazada is always `normal.delivery_option_economy=No`,
+  `normal.Hazmat=None`, then `normal.material=<extracted>`, with **Lazada
+  Item Specifications** appended after.
+- **Description**: combines **three** fields — Main Description, Main
+  Description 2, and Measurement — joined with line breaks, instead of
+  Hydro Flask's two-field Main+Long combo.
 
 ## Setup (one time)
 
