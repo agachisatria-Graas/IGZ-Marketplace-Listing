@@ -6,17 +6,22 @@ TikTok Shop, and Zalora Indonesia** — matching the column layouts of your
 
 ## Files
 
-- `app.py` — the Streamlit app itself, with **three tabs**: the Hydro Flask
-  Marketplace Listing Tool, a standalone Image Link Combiner, and the
-  Herschel Marketplace Listing Tool (all independent of each other, just
-  hosted at the same link).
+- `app.py` — the Streamlit app itself, with **four tabs**: the Hydro Flask
+  Marketplace Listing Tool, a standalone Image Link Combiner, the Herschel
+  Marketplace Listing Tool, and the Toms Marketplace Listing Tool (all
+  independent of each other, just hosted at the same link).
 - `mapping.py` — Hydro Flask's conversion logic (raw row → each
   marketplace's columns)
 - `herschel_mapping.py` — Herschel's conversion logic — a fully separate
   module with its own category-matching rule (exact match on Product Type +
   Specific Category + Gender) and material-extraction logic, though it
   reuses Hydro Flask's brand-agnostic helpers (image joining, HTML
-  conversion, output header layouts) rather than duplicating them
+  conversion) rather than duplicating them
+- `toms_mapping.py` — Toms' conversion logic — another fully separate
+  module, with a THIRD category-matching rule (Gender-in-Title AND
+  Words-in-Title as Title keywords, combined with an exact match on
+  Specific Category), fixed Material=Rubber specs, and the same
+  image-based Zalora ColorFamily classification approach as Herschel's
 - `image_combiner.py` — the Image Link Combiner's logic
 - `raw_data_template.xlsx` / `category_mapping_template.xlsx` — Hydro
   Flask's input templates
@@ -24,8 +29,11 @@ TikTok Shop, and Zalora Indonesia** — matching the column layouts of your
   — Herschel's input templates (you can also upload your real
   `IGZ_Herschel_category_sheet.xlsx`-style file directly instead of the blank
   template)
-- `build_template.py` / `build_herschel_template.py` — regenerate the
-  respective pair of templates if you want to tweak them
+- `toms_raw_data_template.xlsx` / `toms_category_mapping_template.xlsx` —
+  Toms' input templates (same idea — you can upload your real
+  `IGZ_Toms_category_sheet.xlsx`-style file directly instead)
+- `build_template.py` / `build_herschel_template.py` / `build_toms_template.py`
+  — regenerate the respective pair of templates if you want to tweak them
 
 ## Herschel tool — how it differs from Hydro Flask's
 
@@ -84,6 +92,43 @@ TikTok Shop, and Zalora Indonesia** — matching the column layouts of your
   comes back blank — extend the dict with the new pair when that happens.
 - **Season / Year**: simple pass-through raw columns, used only by Zalora's
   output.
+
+## Toms tool — how it differs from both
+
+- **Category ID**: a THIRD matching rule — a row in the category mapping
+  file matches when its **Gender in Title** word AND its **Words in Title**
+  word both appear as substrings anywhere in the item's **Title** (e.g.
+  "Women" and "Mule"), **AND** its **Specific Category** exactly matches the
+  raw row's own Specific Category field (e.g. `BCKSANDALS`). First matching
+  row (top to bottom in the sheet) wins — put more specific keyword
+  combinations above more generic fallback rows.
+- **Material**: Shopee/Lazada's Material spec is a **fixed** `Rubber` value
+  (not extracted from any column, unlike Herschel) — Shopee spec 1-2 are
+  always `Brand=Toms`, `Material=Rubber`; Lazada spec 1-3 are always the
+  same delivery/Hazmat pair as Hydro Flask/Herschel, then
+  `normal.material=Rubber`. The raw **Material** field, if filled in, is
+  passed straight through to Zalora's own Material column only.
+- **Description**: combines just **two** fields — Main Description and Main
+  Description 2 — joined with a line break (no Measurement field, unlike
+  Herschel, since Toms' raw file doesn't have one).
+- **Gender\* code**: `WN` → `Female` confirmed so far
+  (`GENDER_CODE_TO_ZALORA_GENDER` in `toms_mapping.py`) — extend this as
+  more codes (e.g. a Men's code) come up.
+- **Output headers** match Agachi's real Toms templates exactly — Shopee
+  (50 cols, same as Herschel's), Lazada (65 cols, same as Herschel's),
+  TikTok (39 cols, in Indonesian, with **footwear**-specific attribute
+  columns like Bahan/Musim/Bentuk Jari Kaki/Tinggi Hak, different from
+  Herschel's bag attributes), and Zalora (53 cols, with footwear-specific
+  fields like UpperMaterial/SoleMaterial/LeatherType). These are defined
+  independently in `toms_mapping.py`.
+- **TikTok**: `Bahan` defaults to `Rubber` and `Musim` defaults to the
+  **Season** field, both overridable via **TikTok Item Specifications**
+  using the same named-column-match approach as Herschel's tool.
+- **Zalora ColorFamily / SubCatType**: same automatic approach as
+  Herschel's — image-based classification with a keyword fallback for
+  ColorFamily, and a fixed `PRIMARY_CATEGORY_TO_SUBCAT` lookup table for
+  SubCatType (both in `toms_mapping.py`, extend as needed). The app flags
+  any SKU where either couldn't be resolved.
 
 ## Setup (one time)
 
