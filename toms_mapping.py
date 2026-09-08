@@ -326,30 +326,31 @@ ZALORA_HEADERS = [
 
 
 # ---------------------------------------------------------------------------
-# Shopee
+# Shopee & Lazada — grouped variant output.
+#
+# When a Parent SKU has more than one variant, Agachi's real Shopee/Lazada
+# templates add ONE extra "header" row above the variant rows: SKU blank,
+# Total variation = COUNT of variant SKUs (not axis count), Variation 1/2 =
+# the axis NAMES (Shopee: as typed, e.g. "Color"/"Size"; Lazada: the fixed
+# system attribute keys "color_family"/"size"), description filled only
+# here, and images = PARENT images only. Variant rows below then carry the
+# axis VALUES verbatim (no "Name:" prefix), blank description, and merged
+# (parent+variant) images. Single-SKU products get no header row at all —
+# same flat single-row behavior as before.
 # ---------------------------------------------------------------------------
 
-def build_shopee_row(row, group):
-    axes = variant_label(row)
-    total_variation = len(axes) if len(group) > 1 else 0
-    var1 = f"{axes[0][0]}:{axes[0][1]}" if len(axes) >= 1 and total_variation else ""
-    var2 = f"{axes[1][0]}:{axes[1][1]}" if len(axes) >= 2 and total_variation else ""
+LAZADA_AXIS1_SYSTEM_NAME = "color_family"
+LAZADA_AXIS2_SYSTEM_NAME = "size"
 
-    imgs = merged_images(row)
+
+def _shopee_common_fields(row):
     specs = shopee_default_specs(row) + parse_specs(row.get("shopee_item_specifications"))
-
     out = {
-        "Seller SKU": row.get("sku"),
         "Product Name": row.get("title"),
-        "Product Description 1": combined_description(row),
-        "Total variation": total_variation or "",
-        "Variation 1": var1,
-        "Variation 2": var2,
         "RRP": to_number(row.get("price")),
         "Currency Code": "IDR",
         "SRP": to_number(row.get("price")),
         "Quantity": to_number(row.get("stock")),
-        "Product Image URL(s)": IMG_SEP.join(imgs),
         "Category ID": row.get("shopee_category_id"),
         "Shipping Service Details": row.get("shopee_shipping_service"),
         "Weight (Kg)": to_number(row.get("weight_kg")),
@@ -359,37 +360,73 @@ def build_shopee_row(row, group):
     }
     for i, (k, v) in enumerate(specs[:25], start=1):
         out[f"Product Specification {i}"] = f"{k}={v}"
-    return [out.get(h, "") for h in SHOPEE_HEADERS]
+    return out
 
 
-# ---------------------------------------------------------------------------
-# Lazada
-# ---------------------------------------------------------------------------
+def _sort_group(group):
+    return sorted(
+        group,
+        key=lambda r: (
+            str(r.get("title") or ""),
+            str(r.get("variant_value_1") or ""),
+            str(r.get("variant_value_2") or ""),
+        ),
+    )
 
-def build_lazada_row(row, group):
-    axes = variant_label(row)
-    total_variation = len(axes) if len(group) > 1 else 0
-    var1 = f"{axes[0][0]}:{axes[0][1]}" if len(axes) >= 1 and total_variation else ""
-    var2 = f"{axes[1][0]}:{axes[1][1]}" if len(axes) >= 2 and total_variation else ""
 
-    imgs = merged_images(row)
+def build_shopee_group_rows(group):
+    group = _sort_group(group)
+    if len(group) == 1:
+        row = group[0]
+        out = _shopee_common_fields(row)
+        out.update({
+            "Seller SKU": row.get("sku"),
+            "Product Description 1": combined_description(row),
+            "Total variation": "",
+            "Variation 1": "",
+            "Variation 2": "",
+            "Product Image URL(s)": IMG_SEP.join(merged_images(row)),
+        })
+        return [[out.get(h, "") for h in SHOPEE_HEADERS]]
+
+    rep = group[0]
+    rows_out = []
+    header = _shopee_common_fields(rep)
+    header.update({
+        "Seller SKU": "",
+        "Product Description 1": combined_description(rep),
+        "Total variation": len(group),
+        "Variation 1": rep.get("variant_name_1") or "",
+        "Variation 2": rep.get("variant_name_2") or "",
+        "Product Image URL(s)": IMG_SEP.join(split_images(rep.get("parent_images"))),
+    })
+    rows_out.append([header.get(h, "") for h in SHOPEE_HEADERS])
+
+    for row in group:
+        child = _shopee_common_fields(row)
+        child.update({
+            "Seller SKU": row.get("sku"),
+            "Product Description 1": "",
+            "Total variation": "",
+            "Variation 1": row.get("variant_value_1") or "",
+            "Variation 2": row.get("variant_value_2") or "",
+            "Product Image URL(s)": IMG_SEP.join(merged_images(row)),
+        })
+        rows_out.append([child.get(h, "") for h in SHOPEE_HEADERS])
+    return rows_out
+
+
+def _lazada_common_fields(row):
     specs = lazada_default_specs(row) + parse_specs(row.get("lazada_item_specifications"))
     title = row.get("title") or ""
-
     out = {
-        "Seller SKU": row.get("sku"),
         "Product Name": title,
         "Product Name (English)": title,
-        "Product Description 1": script_description(row),
-        "Total variation": total_variation or "",
-        "Variation 1": var1,
-        "Variation 2": var2,
         "Short Description": short_description_html(row),
         "SRP": to_number(row.get("price")),
         "RRP": to_number(row.get("price")),
         "Currency Code": "IDR",
         "Quantity": to_number(row.get("stock")),
-        "Product Image URL(s)": IMG_SEP.join(imgs),
         "Category ID": row.get("lazada_category_id"),
         "Brand": row.get("brand"),
         "Package Weight (kg)": to_number(row.get("weight_kg")),
@@ -400,7 +437,49 @@ def build_lazada_row(row, group):
     }
     for i, (k, v) in enumerate(specs[:25], start=1):
         out[f"Product Specification {i}"] = f"{k}={v}"
-    return [out.get(h, "") for h in LAZADA_HEADERS]
+    return out
+
+
+def build_lazada_group_rows(group):
+    group = _sort_group(group)
+    if len(group) == 1:
+        row = group[0]
+        out = _lazada_common_fields(row)
+        out.update({
+            "Seller SKU": row.get("sku"),
+            "Product Description 1": script_description(row),
+            "Total variation": "",
+            "Variation 1": "",
+            "Variation 2": "",
+            "Product Image URL(s)": IMG_SEP.join(merged_images(row)),
+        })
+        return [[out.get(h, "") for h in LAZADA_HEADERS]]
+
+    rep = group[0]
+    rows_out = []
+    header = _lazada_common_fields(rep)
+    header.update({
+        "Seller SKU": "",
+        "Product Description 1": script_description(rep),
+        "Total variation": len(group),
+        "Variation 1": LAZADA_AXIS1_SYSTEM_NAME if rep.get("variant_name_1") else "",
+        "Variation 2": LAZADA_AXIS2_SYSTEM_NAME if rep.get("variant_name_2") else "",
+        "Product Image URL(s)": IMG_SEP.join(split_images(rep.get("parent_images"))),
+    })
+    rows_out.append([header.get(h, "") for h in LAZADA_HEADERS])
+
+    for row in group:
+        child = _lazada_common_fields(row)
+        child.update({
+            "Seller SKU": row.get("sku"),
+            "Product Description 1": "",
+            "Total variation": "",
+            "Variation 1": row.get("variant_value_1") or "",
+            "Variation 2": row.get("variant_value_2") or "",
+            "Product Image URL(s)": IMG_SEP.join(merged_images(row)),
+        })
+        rows_out.append([child.get(h, "") for h in LAZADA_HEADERS])
+    return rows_out
 
 
 # ---------------------------------------------------------------------------
@@ -493,17 +572,32 @@ def build_zalora_row(row, group):
     return [out.get(h, "") for h in ZALORA_HEADERS]
 
 
-BUILDERS = {
-    "shopee": (SHOPEE_HEADERS, build_shopee_row),
-    "lazada": (LAZADA_HEADERS, build_lazada_row),
+GROUPED_BUILDERS = {
+    "shopee": (SHOPEE_HEADERS, build_shopee_group_rows),
+    "lazada": (LAZADA_HEADERS, build_lazada_group_rows),
+}
+PER_ROW_BUILDERS = {
     "tiktok": (TIKTOK_HEADERS, build_tiktok_row),
     "zalora": (ZALORA_HEADERS, build_zalora_row),
 }
 
 
 def build_platform_rows(platform, rows):
-    headers, builder = BUILDERS[platform]
     groups = group_rows_by_parent(rows)
+
+    if platform in GROUPED_BUILDERS:
+        headers, group_builder = GROUPED_BUILDERS[platform]
+        out_rows = []
+        seen_parents = []
+        for r in rows:
+            key = str(r.get("parent_id") or r.get("sku"))
+            if key not in seen_parents:
+                seen_parents.append(key)
+        for key in seen_parents:
+            out_rows.extend(group_builder(groups[key]))
+        return headers, out_rows
+
+    headers, builder = PER_ROW_BUILDERS[platform]
     out_rows = []
     for r in rows:
         group = groups[str(r.get("parent_id") or r.get("sku"))]

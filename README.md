@@ -129,6 +129,29 @@ TikTok Shop, and Zalora Indonesia** — matching the column layouts of your
   ColorFamily, and a fixed `PRIMARY_CATEGORY_TO_SUBCAT` lookup table for
   SubCatType (both in `toms_mapping.py`, extend as needed). The app flags
   any SKU where either couldn't be resolved.
+- **Shopee/Lazada grouped-variant output**: this is the one place Toms'
+  output structure itself differs from Hydro Flask/Herschel's flat
+  one-row-per-SKU files. When a Parent SKU has more than one variant SKU,
+  the tool adds one extra **header row** above them, matching Agachi's real
+  Shopee/Lazada files exactly:
+  - Header row: Seller SKU blank, Product Description filled (only here),
+    **Total variation = the count of variant SKUs** in the group (not the
+    number of variant axes), Variation 1/2 = the axis **names** (Shopee:
+    whatever's typed in Variant Name 1/2, e.g. "Color"/"Size"; Lazada: the
+    fixed system keys `color_family`/`size`), and Product Image URL(s) =
+    **Parent Images only**.
+  - Variant rows below: Seller SKU filled, description **blank**,
+    Total variation blank, Variation 1/2 = the raw variant **values**
+    verbatim (no "Name:" prefix — type `US:9` directly into Variant Value 2
+    if that's the format you want to appear), and images = merged
+    Parent+Variant Images as usual.
+  - Rows within a group are sorted by Title, then Variation 1, then
+    Variation 2.
+  - A Parent SKU with only one SKU (no real variant) gets no header row —
+    same flat single-row behavior as every other tool.
+  - This grouping logic lives in `build_shopee_group_rows()` /
+    `build_lazada_group_rows()` in `toms_mapping.py` — TikTok and Zalora
+    are untouched, still one row per SKU.
 
 ## Setup (one time)
 
