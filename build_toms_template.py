@@ -20,7 +20,6 @@ TOMS_RAW_COLUMNS = [
     ("variant_name_2", "Variant Name 2 (optional)", "Second variant axis.", ""),
     ("variant_value_2", "Variant Value 2 (optional)", "", ""),
     ("price", "Price", "Selling price, numbers only.", 899000),
-    ("stock", "Stock / Quantity", "", 20),
     ("parent_images", "Parent Images", "Image URLs shared by all variants, separated by ' ; ' (space-semicolon-space). Used for Shopee/Lazada/TikTok.", "https://example.com/img1.jpg ; https://example.com/img2.jpg"),
     ("variant_images", "Variant Images (optional)", "Image URLs specific to this one variant only, separated by ' ; '. Used for Shopee/Lazada/TikTok — Zalora uses its own separate image field below.", ""),
     ("weight_kg", "Weight (kg)", "", 1),
@@ -44,10 +43,10 @@ TOMS_RAW_COLUMNS = [
 # (Gender in Title, Words in Title, Specific Category, Category ID) —
 # matching Agachi's real IGZ_Toms_category_sheet.xlsx layout exactly.
 TOMS_CATEGORY_SHEETS = {
-    "Shopee Category": ("Gender in Title", "Words in Title", "Specific Category", "ID Shopee Category id", "Women", "Mary Jane", "SNEAKERS", 100591),
-    "Lazada category": ("Gender in Title", "Words in Title", "Specific Category", "ID Lazada Category id", "Women", "Mary Jane", "SNEAKERS", 14883),
-    "Tiktok Category": ("Gender in Title", "Words in Title", "Specific Category", "ID Tiktok Category id", "Women", "Mary Jane", "SNEAKERS", "Sepatu Wanita/Sepatu Mary Jane"),
-    "Zalora Category": ("Gender in Title", "Words in Title", "Specific Category", "ID Zalora Category id", "Women", "Mary Jane", "SNEAKERS", "2171 - Sepatu / Sepatu Wanita / Slip On"),
+    "Shopee Category": ("Gender in Title", "Words in Title", "Specific Category", "ID Shopee Category id", "Sizechart Images", "Women", "Mary Jane", "SNEAKERS", 100591, "https://example.com/sizechart.jpg"),
+    "Lazada category": ("Gender in Title", "Words in Title", "Specific Category", "ID Lazada Category id", "Sizechart Images", "Women", "Mary Jane", "SNEAKERS", 14883, "https://example.com/sizechart.jpg"),
+    "Tiktok Category": ("Gender in Title", "Words in Title", "Specific Category", "ID Tiktok Category id", "Sizechart Images", "Women", "Mary Jane", "SNEAKERS", "Sepatu Wanita/Sepatu Mary Jane", "https://example.com/sizechart.jpg"),
+    "Zalora Category": ("Gender in Title", "Words in Title", "Specific Category", "ID Zalora Category id", "Sizechart Images", "Women", "Mary Jane", "SNEAKERS", "2171 - Sepatu / Sepatu Wanita / Slip On", "https://example.com/sizechart.jpg"),
 }
 
 HEADER_FONT = Font(name="Arial", bold=True, color="FFFFFF")
@@ -83,9 +82,9 @@ def build_toms_raw_data_workbook():
 def build_toms_category_mapping_workbook():
     wb = openpyxl.Workbook()
     wb.remove(wb.active)
-    for sheet_name, (h1, h2, h3, h4, gw, w, sc, cid) in TOMS_CATEGORY_SHEETS.items():
+    for sheet_name, (h1, h2, h3, h4, h5, gw, w, sc, cid, sizechart) in TOMS_CATEGORY_SHEETS.items():
         ws = wb.create_sheet(sheet_name)
-        for i, h in enumerate((h1, h2, h3, h4), start=1):
+        for i, h in enumerate((h1, h2, h3, h4, h5), start=1):
             c = ws.cell(row=1, column=i, value=h)
             c.font = HEADER_FONT
             c.fill = HEADER_FILL
@@ -93,7 +92,8 @@ def build_toms_category_mapping_workbook():
         ws.cell(row=2, column=2, value=w)
         ws.cell(row=2, column=3, value=sc)
         ws.cell(row=2, column=4, value=cid)
-        for i in range(1, 5):
+        ws.cell(row=2, column=5, value=sizechart)
+        for i in range(1, 6):
             ws.column_dimensions[get_column_letter(i)].width = 28
         ws.freeze_panes = "A2"
     return wb

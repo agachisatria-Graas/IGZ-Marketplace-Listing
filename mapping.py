@@ -79,6 +79,15 @@ def combined_description(row):
     return main or long_
 
 
+def parent_image_html_snippet(row):
+    """Appended to the very end of Lazada's item description: an HTML image
+    tag for the first Parent Image, in the exact format Agachi specified."""
+    imgs = split_images(row.get("parent_images"))
+    if not imgs:
+        return ""
+    return f'<p style="text-align:center"><img src="{imgs[0]}"100%"/></p>'
+
+
 def script_description(row):
     """Lazada/Zalora HTML description: explicit override wins, else auto-convert."""
     override = row.get("description_script_override")
@@ -243,7 +252,7 @@ def build_shopee_row(row, group):
         "RRP": to_number(row.get("price")),
         "Currency Code": "IDR",
         "SRP": to_number(row.get("price")),
-        "Quantity": to_number(row.get("stock")),
+        "Quantity": 0,
         "Product Image URL(s)": IMG_SEP.join(imgs),
         "Category ID": row.get("shopee_category_id"),
         "Shipping Service Details": row.get("shopee_shipping_service"),
@@ -284,7 +293,7 @@ def build_lazada_row(row, group):
         "Seller SKU": row.get("sku"),
         "Product Name": title,
         "Product Name (English)": title,
-        "Product Description 1": script_description(row),
+        "Product Description 1": script_description(row) + parent_image_html_snippet(row),
         "Total variation": total_variation or "",
         "Variation 1": var1,
         "Variation 2": var2,
@@ -292,7 +301,7 @@ def build_lazada_row(row, group):
         "SRP": to_number(row.get("price")),
         "RRP": to_number(row.get("price")),
         "Currency Code": "IDR",
-        "Quantity": to_number(row.get("stock")),
+        "Quantity": 0,
         "Product Image URL(s)": IMG_SEP.join(imgs),
         "Category ID": row.get("lazada_category_id"),
         "Brand": row.get("brand"),
@@ -350,7 +359,7 @@ def build_tiktok_row(row, group):
         "parcel_width": to_number(row.get("width_cm")),
         "parcel_height": to_number(row.get("height_cm")),
         "price": to_number(row.get("price")),
-        "quantity": to_number(row.get("stock")),
+        "quantity": 0,
         "seller_sku": row.get("sku"),
     }
     # NOTE: TikTok's real bulk template names these columns "product_property/<id>",
@@ -404,7 +413,7 @@ def build_zalora_row(row, group):
         "ColorFamily": row.get("zalora_color_family"),
         "Color": row.get("zalora_color"),
         "Variation": variation,
-        "Quantity": to_number(row.get("stock")),
+        "Quantity": 0,
         "Price": to_number(row.get("price")),
         "Description": script_description(row),
         "Material": material,

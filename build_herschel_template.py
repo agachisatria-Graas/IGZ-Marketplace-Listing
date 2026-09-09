@@ -21,7 +21,6 @@ HERSCHEL_RAW_COLUMNS = [
     ("variant_name_2", "Variant Name 2 (optional)", "Second variant axis.", ""),
     ("variant_value_2", "Variant Value 2 (optional)", "", ""),
     ("price", "Price", "Selling price, numbers only.", 1299000),
-    ("stock", "Stock / Quantity", "", 30),
     ("parent_images", "Parent Images", "Image URLs shared by all variants, separated by ' ; ' (space-semicolon-space). Used for Shopee/Lazada/TikTok.", "https://example.com/img1.jpg ; https://example.com/img2.jpg"),
     ("variant_images", "Variant Images (optional)", "Image URLs specific to this one variant only, separated by ' ; '. Used for Shopee/Lazada/TikTok — Zalora uses its own separate image field below.", ""),
     ("weight_kg", "Weight (kg)", "If copying from a spec sheet showing both units (e.g. '1.10 lb / 0.5'), paste it as-is — the tool automatically takes the number AFTER the '/' as the kg value. A plain number with no slash also works fine.", "1.10 lb / 0.5"),

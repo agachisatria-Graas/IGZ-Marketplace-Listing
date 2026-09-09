@@ -249,3 +249,18 @@ while you use it; close the terminal to stop it.
   adjusting as your templates evolve — each marketplace has its own
   `build_<platform>_row()` function, and category-keyword matching lives in
   `match_keyword_category()` / `apply_title_category_mapping()`.
+- **Quantity is always output as 0** for all three tools (Hydro Flask,
+  Herschel, Toms), across all four marketplaces — there's no Stock field
+  in any of the raw data templates anymore.
+- **Lazada description**: for all three tools, the very end of the
+  description always gets an extra HTML image tag for the first **Parent
+  Image**, appended after the regular description text —
+  `<p style="text-align:center"><img src="(first Parent Image URL)"100%"/></p>`
+  exactly as given. This comes from `parent_image_html_snippet()` in
+  `mapping.py`, imported and reused by `herschel_mapping.py` and
+  `toms_mapping.py`.
+- **Toms' category mapping file has a 5th column, Sizechart Images**: the
+  tool fills Shopee/Lazada's own **Size chart Image URL** column from it,
+  and for TikTok/Zalora — which have no dedicated sizechart field — appends
+  it as one more image after the real product images, based on whichever
+  category row matched that item.

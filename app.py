@@ -17,7 +17,7 @@ RAW_COLUMNS = [
     "parent_id", "sku", "title", "main_description", "long_description",
     "description_script_override", "short_description", "brand",
     "variant_name_1", "variant_value_1", "variant_name_2", "variant_value_2",
-    "price", "stock", "parent_images", "variant_images", "weight_kg", "length_cm",
+    "price", "parent_images", "variant_images", "weight_kg", "length_cm",
     "width_cm", "height_cm", "shopee_shipping_service",
     "shopee_item_specifications", "lazada_item_specifications",
     "tiktok_item_specifications", "zalora_gender",
@@ -31,7 +31,7 @@ RAW_LABEL_TO_KEY = {
     "Short Description (Lazada)": "short_description", "Brand": "brand",
     "Variant Name 1 (optional)": "variant_name_1", "Variant Value 1 (optional)": "variant_value_1",
     "Variant Name 2 (optional)": "variant_name_2", "Variant Value 2 (optional)": "variant_value_2",
-    "Price": "price", "Stock / Quantity": "stock",
+    "Price": "price",
     "Parent Images": "parent_images", "Variant Images (optional)": "variant_images",
     "Weight (kg)": "weight_kg", "Length (cm)": "length_cm", "Width (cm)": "width_cm",
     "Height (cm)": "height_cm",
@@ -141,7 +141,7 @@ HERSCHEL_RAW_COLUMNS = [
     "parent_id", "sku", "title", "main_description", "main_description_2",
     "measurement", "description_script_override", "short_description", "brand",
     "variant_name_1", "variant_value_1", "variant_name_2", "variant_value_2",
-    "price", "stock", "parent_images", "variant_images", "weight_kg", "length_cm",
+    "price", "parent_images", "variant_images", "weight_kg", "length_cm",
     "width_cm", "height_cm", "product_type", "specific_category", "gender",
     "material", "shopee_shipping_service", "shopee_item_specifications",
     "lazada_item_specifications", "tiktok_item_specifications", "season", "year",
@@ -156,7 +156,7 @@ HERSCHEL_RAW_LABEL_TO_KEY = {
     "Short Description (Lazada)": "short_description", "Brand": "brand",
     "Variant Name 1 (optional)": "variant_name_1", "Variant Value 1 (optional)": "variant_value_1",
     "Variant Name 2 (optional)": "variant_name_2", "Variant Value 2 (optional)": "variant_value_2",
-    "Price": "price", "Stock / Quantity": "stock",
+    "Price": "price",
     "Parent Images": "parent_images", "Variant Images (optional)": "variant_images",
     "Weight (kg)": "weight_kg", "Length (cm)": "length_cm", "Width (cm)": "width_cm",
     "Height (cm)": "height_cm", "Product Type": "product_type",
@@ -228,7 +228,7 @@ TOMS_RAW_COLUMNS = [
     "parent_id", "sku", "title", "main_description", "main_description_2",
     "description_script_override", "short_description", "brand",
     "variant_name_1", "variant_value_1", "variant_name_2", "variant_value_2",
-    "price", "stock", "parent_images", "variant_images", "weight_kg", "length_cm",
+    "price", "parent_images", "variant_images", "weight_kg", "length_cm",
     "width_cm", "height_cm", "specific_category", "gender", "material",
     "shopee_shipping_service", "shopee_item_specifications",
     "lazada_item_specifications", "tiktok_item_specifications", "season", "year",
@@ -242,7 +242,7 @@ TOMS_RAW_LABEL_TO_KEY = {
     "Short Description (Lazada)": "short_description", "Brand": "brand",
     "Variant Name 1 (optional)": "variant_name_1", "Variant Value 1 (optional)": "variant_value_1",
     "Variant Name 2 (optional)": "variant_name_2", "Variant Value 2 (optional)": "variant_value_2",
-    "Price": "price", "Stock / Quantity": "stock",
+    "Price": "price",
     "Parent Images": "parent_images", "Variant Images (optional)": "variant_images",
     "Weight (kg)": "weight_kg", "Length (cm)": "length_cm", "Width (cm)": "width_cm",
     "Height (cm)": "height_cm", "Specific Category": "specific_category",
@@ -273,10 +273,11 @@ def load_toms_raw_file(uploaded_file):
 
 def load_toms_category_mapping_workbook(uploaded_file):
     """Reads a category mapping workbook: one sheet per marketplace, each with
-    (Gender in Title, Words in Title, Specific Category, Category ID) columns
-    — matched positionally. Sheets matched to a marketplace by checking if
-    'shopee'/'lazada'/'tiktok'/'zalora' appears in the sheet name.
-    Returns ({'shopee': [{'gender_word':..,'words':..,'specific_category':..,'id':..}, ...], ...}, matched_sheet_names)
+    (Gender in Title, Words in Title, Specific Category, Category ID, and
+    optionally a 5th Sizechart Images column) — matched positionally. Sheets
+    matched to a marketplace by checking if 'shopee'/'lazada'/'tiktok'/'zalora'
+    appears in the sheet name.
+    Returns ({'shopee': [{'gender_word':..,'words':..,'specific_category':..,'id':..,'sizechart':..}, ...], ...}, matched_sheet_names)
     """
     sheets = pd.read_excel(uploaded_file, sheet_name=None, header=0)
     out = {p: [] for p in CATEGORY_SHEET_PLATFORM.values()}
@@ -293,6 +294,7 @@ def load_toms_category_mapping_workbook(uploaded_file):
         df = df.dropna(how="all")
         for _, row in df.iterrows():
             gender_word, words, sc, cat_id = row.iloc[0], row.iloc[1], row.iloc[2], row.iloc[3]
+            sizechart = row.iloc[4] if df.shape[1] >= 5 else None
             if pd.isna(sc) or str(sc).strip() == "":
                 continue
             out[platform].append({
@@ -300,6 +302,7 @@ def load_toms_category_mapping_workbook(uploaded_file):
                 "words": "" if pd.isna(words) else words,
                 "specific_category": sc,
                 "id": "" if pd.isna(cat_id) else cat_id,
+                "sizechart": "" if pd.isna(sizechart) else sizechart,
             })
     return out, matched_sheets
 
@@ -350,6 +353,14 @@ def render_toms_listing_tool():
             "dominant color (falling back to a keyword match on the Color "
             "name if no image is available), and SubCatType is looked up "
             "from the PrimaryCategory your category mapping resolves to."
+        )
+        st.write(
+            "The category mapping file also has a **5th column, Sizechart "
+            "Images** — the tool fills Shopee/Lazada's own Size chart Image "
+            "URL column from it, and appends it as an extra image (after "
+            "your real product images) for TikTok and Zalora, based on "
+            "whichever category row matched. **Quantity is always output as "
+            "0** across all four marketplaces, regardless of any stock info."
         )
 
     col1, col2 = st.columns(2)
@@ -514,7 +525,10 @@ def render_herschel_listing_tool():
             "SubCatType is looked up from the PrimaryCategory your category "
             "mapping resolves to. **Weight** can be pasted straight from a "
             "spec sheet showing both units, e.g. `1.10 lb / 0.5` — the tool "
-            "automatically takes the number after the `/` as kilograms."
+            "automatically takes the number after the `/` as kilograms. "
+            "**Quantity is always output as 0** across all four marketplaces, "
+            "and Lazada's description always ends with an HTML image tag for "
+            "the first Parent Image, in addition to the regular description."
         )
 
     col1, col2 = st.columns(2)
@@ -657,6 +671,11 @@ def render_listing_tool():
             data=file_bytes("category_mapping_template.xlsx"),
             file_name="category_mapping_template.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        st.write(
+            "**Quantity is always output as 0** across all four marketplaces. "
+            "Lazada's description also always ends with an HTML image tag for "
+            "the first Parent Image, in addition to the regular description."
         )
 
     col1, col2 = st.columns(2)

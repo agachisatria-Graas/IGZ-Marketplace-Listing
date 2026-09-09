@@ -18,7 +18,6 @@ RAW_COLUMNS = [
     ("variant_name_2", "Variant Name 2 (optional)", "Second variant axis, e.g. Size.", ""),
     ("variant_value_2", "Variant Value 2 (optional)", "", ""),
     ("price", "Price", "Selling price, numbers only.", 849000),
-    ("stock", "Stock / Quantity", "", 50),
     ("parent_images", "Parent Images", "Image URLs shared by all variants, separated by ' ; ' (space-semicolon-space).", "https://example.com/img1.jpg ; https://example.com/img2.jpg"),
     ("variant_images", "Variant Images (optional)", "Image URLs specific to this one variant only, separated by ' ; '. Leave blank if none. Used for Shopee/Lazada/TikTok — Zalora uses its own separate image field below.", ""),
     ("weight_kg", "Weight (kg)", "", 0.5),

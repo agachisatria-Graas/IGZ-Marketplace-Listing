@@ -37,7 +37,7 @@ from PIL import Image
 from mapping import (
     split_images, merged_images, zalora_image_list, text_to_html,
     lines_to_bullets_html, parse_specs, variant_label, group_rows_by_parent,
-    to_number,
+    to_number, parent_image_html_snippet,
 )
 
 IMG_SEP = " ; "
@@ -190,11 +190,10 @@ def _norm(v):
     return str(v or "").strip().upper()
 
 
-def match_toms_category(title, specific_category, entries):
-    """entries: list of {'gender_word':.., 'words':.., 'specific_category':.., 'id':..}.
-    Returns the id of the first entry where both gender_word and words are
-    found (case-insensitive substring) in `title`, AND specific_category
-    exactly matches (case-insensitive). Returns None if nothing matches."""
+def match_toms_category_entry(title, specific_category, entries):
+    """Same matching logic as match_toms_category, but returns the whole
+    matched entry dict (so callers can also read its 'sizechart' URL),
+    not just the id."""
     title_l = str(title or "").lower()
     sc = _norm(specific_category)
     for e in entries:
@@ -206,8 +205,25 @@ def match_toms_category(title, specific_category, entries):
             continue
         if _norm(e.get("specific_category")) != sc:
             continue
-        return e.get("id")
+        return e
     return None
+
+
+def match_toms_category(title, specific_category, entries):
+    """entries: list of {'gender_word':.., 'words':.., 'specific_category':.., 'id':..}.
+    Returns the id of the first entry where both gender_word and words are
+    found (case-insensitive substring) in `title`, AND specific_category
+    exactly matches (case-insensitive). Returns None if nothing matches."""
+    e = match_toms_category_entry(title, specific_category, entries)
+    return e.get("id") if e else None
+
+
+PLATFORM_SIZECHART_FIELD = {
+    "shopee": "shopee_sizechart_url",
+    "lazada": "lazada_sizechart_url",
+    "tiktok": "tiktok_sizechart_url",
+    "zalora": "zalora_sizechart_url",
+}
 
 
 def apply_toms_category_mapping(rows, category_sheets):
@@ -218,9 +234,13 @@ def apply_toms_category_mapping(rows, category_sheets):
         r2 = dict(r)
         for platform, field in PLATFORM_CATEGORY_FIELD.items():
             entries = category_sheets.get(platform) or []
-            matched = match_toms_category(r.get("title"), r.get("specific_category"), entries)
-            if matched not in (None, ""):
-                r2[field] = matched
+            entry = match_toms_category_entry(r.get("title"), r.get("specific_category"), entries)
+            if entry:
+                if entry.get("id") not in (None, ""):
+                    r2[field] = entry.get("id")
+                sizechart = entry.get("sizechart")
+                if sizechart:
+                    r2[PLATFORM_SIZECHART_FIELD[platform]] = sizechart
         out.append(r2)
     return out
 
@@ -350,13 +370,14 @@ def _shopee_common_fields(row):
         "RRP": to_number(row.get("price")),
         "Currency Code": "IDR",
         "SRP": to_number(row.get("price")),
-        "Quantity": to_number(row.get("stock")),
+        "Quantity": 0,
         "Category ID": row.get("shopee_category_id"),
         "Shipping Service Details": row.get("shopee_shipping_service"),
         "Weight (Kg)": to_number(row.get("weight_kg")),
         "Package Length(cm)": to_number(row.get("length_cm")),
         "Package Width(cm)": to_number(row.get("width_cm")),
         "Package Height(cm)": to_number(row.get("height_cm")),
+        "Size chart Image URL": row.get("shopee_sizechart_url", ""),
     }
     for i, (k, v) in enumerate(specs[:25], start=1):
         out[f"Product Specification {i}"] = f"{k}={v}"
@@ -426,7 +447,7 @@ def _lazada_common_fields(row):
         "SRP": to_number(row.get("price")),
         "RRP": to_number(row.get("price")),
         "Currency Code": "IDR",
-        "Quantity": to_number(row.get("stock")),
+        "Quantity": 0,
         "Category ID": row.get("lazada_category_id"),
         "Brand": row.get("brand"),
         "Package Weight (kg)": to_number(row.get("weight_kg")),
@@ -434,6 +455,7 @@ def _lazada_common_fields(row):
         "Package Length(cm)": to_number(row.get("length_cm")),
         "Package Width(cm)": to_number(row.get("width_cm")),
         "What's in the Box": f"1 x {title}",
+        "Size chart Image URL": row.get("lazada_sizechart_url", ""),
     }
     for i, (k, v) in enumerate(specs[:25], start=1):
         out[f"Product Specification {i}"] = f"{k}={v}"
@@ -447,7 +469,7 @@ def build_lazada_group_rows(group):
         out = _lazada_common_fields(row)
         out.update({
             "Seller SKU": row.get("sku"),
-            "Product Description 1": script_description(row),
+            "Product Description 1": script_description(row) + parent_image_html_snippet(row),
             "Total variation": "",
             "Variation 1": "",
             "Variation 2": "",
@@ -460,7 +482,7 @@ def build_lazada_group_rows(group):
     header = _lazada_common_fields(rep)
     header.update({
         "Seller SKU": "",
-        "Product Description 1": script_description(rep),
+        "Product Description 1": script_description(rep) + parent_image_html_snippet(rep),
         "Total variation": len(group),
         "Variation 1": LAZADA_AXIS1_SYSTEM_NAME if rep.get("variant_name_1") else "",
         "Variation 2": LAZADA_AXIS2_SYSTEM_NAME if rep.get("variant_name_2") else "",
@@ -489,6 +511,9 @@ def build_lazada_group_rows(group):
 def build_tiktok_row(row, group):
     axes = variant_label(row)
     parent_imgs = split_images(row.get("parent_images"))
+    sizechart = row.get("tiktok_sizechart_url")
+    if sizechart:
+        parent_imgs = parent_imgs + [sizechart]
     image_slots = (parent_imgs + [""] * 9)[:9]
     variant_imgs = split_images(row.get("variant_images"))
     property_1_image = variant_imgs[0] if variant_imgs else ""
@@ -512,7 +537,7 @@ def build_tiktok_row(row, group):
         "Lebar paket(cm)": to_number(row.get("width_cm")),
         "Tinggi paket(cm)": to_number(row.get("height_cm")),
         "Harga Ritel (Mata Uang Lokal)": to_number(row.get("price")),
-        "Kuantitas": to_number(row.get("stock")),
+        "Kuantitas": 0,
         "SKU Penjual": row.get("sku"),
         "Bahan": "Rubber",
         "Musim": row.get("season"),
@@ -535,6 +560,9 @@ def build_zalora_row(row, group):
     variation = ", ".join(v for _, v in axes) if axes else "One Size"
 
     imgs = zalora_image_list(row)
+    sizechart = row.get("zalora_sizechart_url")
+    if sizechart:
+        imgs = imgs + [sizechart]
     image_slots = (imgs + [""] * 8)[:8]
     zalora_gender = GENDER_CODE_TO_ZALORA_GENDER.get(_norm(row.get("gender")), "")
     primary_category = row.get("zalora_category")
@@ -553,7 +581,7 @@ def build_zalora_row(row, group):
         "ColorFamily": color_family,
         "Color": row.get("zalora_color"),
         "Variation": variation,
-        "Quantity": to_number(row.get("stock")),
+        "Quantity": 0,
         "Price": to_number(row.get("price")),
         "Description": script_description(row),
         "Year": row.get("year"),
