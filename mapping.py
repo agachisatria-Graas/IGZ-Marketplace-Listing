@@ -271,12 +271,19 @@ def build_shopee_row(row, group):
 # ---------------------------------------------------------------------------
 
 LAZADA_HEADERS = [
-    "Seller SKU", "Product Name", "Product Name (English)", "Product Description 1",
-    "Product Description 2", "Product Description 3", "Total variation", "Variation 1",
-    "Variation 2", "Variation 3", "Short Description", "SRP", "RRP", "Currency Code",
-    "Quantity", "Product Image URL(s)", "Category ID", "Brand", "Package Weight (kg)",
-    "Package Height(cm)", "Package Length(cm)", "Package Width(cm)", "What's in the Box",
-] + [f"Product Specification {i}" for i in range(1, 26)]
+    "Seller SKU", "Product Name", "Product Name (English)",
+    "Product Description 1", "Product Description 2", "Product Description 3",
+    "Product Description(English) 1", "Product Description(English) 2", "Product Description(English) 3",
+    "Total variation", "Variation 1", "Variation 2", "Variation 3",
+    "Short Description", "Product Highlights \n(English)",
+    "SRP", "Sale Start Date", "Sale End Date", "RRP", "Currency Code", "Quantity",
+    "Product Image URL(s)", "Category ID", "Tax Class", "Brand", "Model", "Warranty Type",
+    "Package Weight (kg)", "Package Height(cm)", "Package Length(cm)", "Package Width(cm)",
+    "What's in the Box", "What's in the Box(English)", "Size chart Image URL",
+] + [f"Product Specification {i}" for i in range(1, 26)] + [
+    "Template Attribute 1", "Template Attribute 2", "Template Attribute 3",
+    "Template Attribute 4", "Template Attribute 5", "Post As Non Variant",
+]
 
 
 def build_lazada_row(row, group):
@@ -305,6 +312,7 @@ def build_lazada_row(row, group):
         "Product Image URL(s)": IMG_SEP.join(imgs),
         "Category ID": row.get("lazada_category_id"),
         "Brand": row.get("brand"),
+        "Warranty Type": "No Warranty",
         "Package Weight (kg)": to_number(row.get("weight_kg")),
         "Package Height(cm)": to_number(row.get("height_cm")),
         "Package Length(cm)": to_number(row.get("length_cm")),
