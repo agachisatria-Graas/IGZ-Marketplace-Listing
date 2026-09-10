@@ -167,20 +167,21 @@ def classify_color_by_image(url, timeout=6):
 
 
 def resolve_color_families(rows):
-    """Adds 'zalora_color_family_resolved' to each row: tries the first
-    Zalora image's dominant color first, falls back to a keyword match on
-    the Color name, else leaves it blank. Returns (new_rows, unresolved_skus).
-    Does not mutate the input."""
+    """Adds 'zalora_color_family_resolved' to each row: tries a keyword
+    match on the Color name FIRST (reliable for descriptive names, and
+    immune to the multi-tone-averaging problem image classification has),
+    falling back to the first Zalora image's dominant color only when the
+    name itself gives no clue (e.g. abstract names like 'Enderman').
+    Returns (new_rows, unresolved_skus). Does not mutate the input."""
     out = []
     unresolved = []
     for r in rows:
         r2 = dict(r)
-        imgs = zalora_image_list(r)
-        family = None
-        if imgs:
-            family = classify_color_by_image(imgs[0])
+        family = classify_color_by_keyword(r.get("zalora_color"))
         if not family:
-            family = classify_color_by_keyword(r.get("zalora_color"))
+            imgs = zalora_image_list(r)
+            if imgs:
+                family = classify_color_by_image(imgs[0])
         r2["zalora_color_family_resolved"] = family or ""
         if not family:
             unresolved.append(r.get("sku"))

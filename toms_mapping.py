@@ -127,17 +127,23 @@ def classify_color_by_image(url, timeout=6):
 
 def resolve_color_families(rows):
     """Adds 'zalora_color_family_resolved' to each row. Returns
-    (new_rows, unresolved_skus). Does not mutate the input."""
+    (new_rows, unresolved_skus). Does not mutate the input.
+
+    Keyword match on the Color name is tried FIRST: descriptive names like
+    'Black/White' or 'Cadet Blue Brushed Twill' are far more reliable than
+    an image's average color, which gets thrown off by multi-tone products
+    (e.g. a black/white upper with a tan sole averages to a muddy brown/grey
+    that matches no real color in the photo). Image classification is only
+    a fallback for names with no recognizable color word at all."""
     out = []
     unresolved = []
     for r in rows:
         r2 = dict(r)
-        imgs = zalora_image_list(r)
-        family = None
-        if imgs:
-            family = classify_color_by_image(imgs[0])
+        family = classify_color_by_keyword(r.get("zalora_color"))
         if not family:
-            family = classify_color_by_keyword(r.get("zalora_color"))
+            imgs = zalora_image_list(r)
+            if imgs:
+                family = classify_color_by_image(imgs[0])
         r2["zalora_color_family_resolved"] = family or ""
         if not family:
             unresolved.append(r.get("sku"))
