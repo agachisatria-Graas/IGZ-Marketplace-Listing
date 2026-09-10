@@ -160,6 +160,10 @@ PRIMARY_CATEGORY_TO_SUBCAT = {
     "11 - Sepatu / Sepatu Pria / Sneakers": "Sneakers",
     "171 - Sepatu / Sepatu Pria / Boots": "Boots",
     "15 - Sepatu / Sepatu Wanita / Boots": "Boots",
+    "12 - Sepatu / Sepatu Wanita / Sneakers": "Sneakers",
+    "2171 - Sepatu / Sepatu Wanita / Slip On": "Slip Ons & Espadrilles",
+    "6 - Sepatu / Sepatu Wanita / Flats": "Ballerina & Flats",
+    "7328 - Sepatu / Sepatu Wanita / Sandal / Espadrilles": "Slip Ons & Espadrilles",
 }
 
 
