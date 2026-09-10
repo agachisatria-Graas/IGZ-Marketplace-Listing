@@ -411,7 +411,7 @@ def build_tiktok_row(row, group):
 
 ZALORA_HEADERS = [
     "SkuSupplierConfig", "ParentSku", "SellerSku", "Brand", "PrimaryCategory", "Gender",
-    "SubCatType", "Name", "ColorFamily", "Color", "Variation", "Quantity", "Price",
+    "SubCatType", "Name", "ColorFamily", "Color", "Sizesystembrand", "Variation", "Quantity", "Price",
     "Description", "CareLabel", "Material",
     "BoxHeightSimple", "BoxLengthSimple", "BoxWidthSimple", "WeightSimple",
     "MainImage", "Image2", "Image3", "Image4", "Image5", "Image6", "Image7", "Image8",
@@ -442,6 +442,7 @@ def build_zalora_row(row, group):
         "SubCatType": row.get("zalora_subcat_type"),
         "Name": ensure_brand_prefix(row.get("title"), row.get("brand")),
         "ColorFamily": row.get("zalora_color_family"),
+        "Sizesystembrand": "International",
         "Color": row.get("zalora_color"),
         "Variation": variation,
         "Quantity": 0,

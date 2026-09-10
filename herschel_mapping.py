@@ -512,6 +512,7 @@ def build_zalora_row(row, group):
         "SubCatType": subcat_type,
         "Name": ensure_brand_prefix(row.get("title"), row.get("brand")),
         "ColorFamily": color_family,
+        "Sizesystembrand": "International",
         "Color": row.get("zalora_color"),
         "Variation": variation,
         "Quantity": 0,

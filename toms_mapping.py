@@ -572,9 +572,22 @@ def build_tiktok_row(row, group):
 # Zalora
 # ---------------------------------------------------------------------------
 
+def zalora_size_variation(row):
+    """Zalora's Variation for Toms is just the size NUMBER, with any unit
+    prefix stripped — e.g. raw Variant Value 2 'US 5.5' -> '5.5'. Falls back
+    to Variant Value 1 (or 'One Size') if there's no size axis at all."""
+    size_value = row.get("variant_value_2")
+    if size_value:
+        stripped = re.sub(r"^[A-Za-z]+[:\s]*", "", str(size_value)).strip()
+        return stripped or str(size_value)
+    color_value = row.get("variant_value_1")
+    if color_value:
+        return str(color_value)
+    return "One Size"
+
+
 def build_zalora_row(row, group):
-    axes = variant_label(row)
-    variation = ", ".join(v for _, v in axes) if axes else "One Size"
+    variation = zalora_size_variation(row)
 
     imgs = zalora_image_list(row)
     sizechart = row.get("zalora_sizechart_url")
@@ -596,6 +609,7 @@ def build_zalora_row(row, group):
         "SubCatType": subcat_type,
         "Name": ensure_brand_prefix(row.get("title"), row.get("brand")),
         "ColorFamily": color_family,
+        "Sizesystembrand": "US",
         "Color": row.get("zalora_color"),
         "Variation": variation,
         "Quantity": 0,
