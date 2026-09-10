@@ -379,7 +379,7 @@ def _shopee_common_fields(row):
         "Product Name": row.get("title"),
         "RRP": to_number(row.get("price")),
         "Currency Code": "IDR",
-        "SRP": to_number(row.get("price")),
+        "SRP": "",
         "Quantity": 0,
         "Category ID": row.get("shopee_category_id"),
         "Shipping Service Details": row.get("shopee_shipping_service"),
@@ -454,7 +454,7 @@ def _lazada_common_fields(row):
         "Product Name": title,
         "Product Name (English)": title,
         "Short Description": short_description_html(row),
-        "SRP": to_number(row.get("price")),
+        "SRP": "",
         "RRP": to_number(row.get("price")),
         "Currency Code": "IDR",
         "Quantity": 0,
@@ -479,9 +479,11 @@ def build_lazada_group_rows(group):
     if len(group) == 1:
         row = group[0]
         out = _lazada_common_fields(row)
+        desc = script_description(row) + parent_image_html_snippet(row)
         out.update({
             "Seller SKU": row.get("sku"),
-            "Product Description 1": script_description(row) + parent_image_html_snippet(row),
+            "Product Description 1": desc,
+            "Product Description(English) 1": desc,
             "Total variation": "",
             "Variation 1": "",
             "Variation 2": "",
@@ -492,9 +494,11 @@ def build_lazada_group_rows(group):
     rep = group[0]
     rows_out = []
     header = _lazada_common_fields(rep)
+    header_desc = script_description(rep) + parent_image_html_snippet(rep)
     header.update({
         "Seller SKU": "",
-        "Product Description 1": script_description(rep) + parent_image_html_snippet(rep),
+        "Product Description 1": header_desc,
+        "Product Description(English) 1": header_desc,
         "Total variation": len(group),
         "Variation 1": LAZADA_AXIS1_SYSTEM_NAME if rep.get("variant_name_1") else "",
         "Variation 2": LAZADA_AXIS2_SYSTEM_NAME if rep.get("variant_name_2") else "",
@@ -507,6 +511,7 @@ def build_lazada_group_rows(group):
         child.update({
             "Seller SKU": row.get("sku"),
             "Product Description 1": "",
+            "Product Description(English) 1": "",
             "Total variation": "",
             "Variation 1": row.get("variant_value_1") or "",
             "Variation 2": row.get("variant_value_2") or "",
