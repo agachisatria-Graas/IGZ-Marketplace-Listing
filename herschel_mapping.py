@@ -33,7 +33,7 @@ from PIL import Image
 from mapping import (
     split_images, merged_images, zalora_image_list, text_to_html,
     lines_to_bullets_html, parse_specs, variant_label, group_rows_by_parent,
-    to_number, parent_image_html_snippet,
+    to_number, parent_image_html_snippet, ensure_brand_prefix,
 )
 
 IMG_SEP = " ; "
@@ -373,7 +373,7 @@ def build_shopee_row(row, group):
 
     out = {
         "Seller SKU": row.get("sku"),
-        "Product Name": row.get("title"),
+        "Product Name": ensure_brand_prefix(row.get("title"), row.get("brand")),
         "Product Description 1": combined_description(row),
         "Total variation": total_variation or "",
         "Variation 1": var1,
@@ -407,7 +407,7 @@ def build_lazada_row(row, group):
 
     imgs = merged_images(row)
     specs = lazada_default_specs(row) + parse_specs(row.get("lazada_item_specifications"))
-    title = row.get("title") or ""
+    title = ensure_brand_prefix(row.get("title"), row.get("brand"))
 
     out = {
         "Seller SKU": row.get("sku"),
@@ -454,7 +454,7 @@ def build_tiktok_row(row, group):
     out = {
         "Kategori": row.get("tiktok_category"),
         "Merek": row.get("brand"),
-        "Nama produk": row.get("title"),
+        "Nama produk": ensure_brand_prefix(row.get("title"), row.get("brand")),
         "Deskripsi produk": combined_description(row),
         "Gambar utama": image_slots[0],
         "Gambar 2": image_slots[1], "Gambar 3": image_slots[2], "Gambar 4": image_slots[3],
@@ -510,7 +510,7 @@ def build_zalora_row(row, group):
         "PrimaryCategory": primary_category,
         "Gender": zalora_gender,
         "SubCatType": subcat_type,
-        "Name": row.get("title"),
+        "Name": ensure_brand_prefix(row.get("title"), row.get("brand")),
         "ColorFamily": color_family,
         "Color": row.get("zalora_color"),
         "Variation": variation,

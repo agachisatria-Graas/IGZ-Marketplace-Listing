@@ -37,7 +37,7 @@ from PIL import Image
 from mapping import (
     split_images, merged_images, zalora_image_list, text_to_html,
     lines_to_bullets_html, parse_specs, variant_label, group_rows_by_parent,
-    to_number, parent_image_html_snippet,
+    to_number, parent_image_html_snippet, ensure_brand_prefix,
 )
 
 IMG_SEP = " ; "
@@ -376,7 +376,7 @@ LAZADA_AXIS2_SYSTEM_NAME = "size"
 def _shopee_common_fields(row):
     specs = shopee_default_specs(row) + parse_specs(row.get("shopee_item_specifications"))
     out = {
-        "Product Name": row.get("title"),
+        "Product Name": ensure_brand_prefix(row.get("title"), row.get("brand")),
         "RRP": to_number(row.get("price")),
         "Currency Code": "IDR",
         "SRP": "",
@@ -449,7 +449,7 @@ def build_shopee_group_rows(group):
 
 def _lazada_common_fields(row):
     specs = lazada_default_specs(row) + parse_specs(row.get("lazada_item_specifications"))
-    title = row.get("title") or ""
+    title = ensure_brand_prefix(row.get("title"), row.get("brand"))
     out = {
         "Product Name": title,
         "Product Name (English)": title,
@@ -538,7 +538,7 @@ def build_tiktok_row(row, group):
     out = {
         "Kategori": row.get("tiktok_category"),
         "Merek": row.get("brand"),
-        "Nama produk": row.get("title"),
+        "Nama produk": ensure_brand_prefix(row.get("title"), row.get("brand")),
         "Deskripsi produk": combined_description(row),
         "Gambar utama": image_slots[0],
         "Gambar 2": image_slots[1], "Gambar 3": image_slots[2], "Gambar 4": image_slots[3],
@@ -594,7 +594,7 @@ def build_zalora_row(row, group):
         "PrimaryCategory": primary_category,
         "Gender": zalora_gender,
         "SubCatType": subcat_type,
-        "Name": row.get("title"),
+        "Name": ensure_brand_prefix(row.get("title"), row.get("brand")),
         "ColorFamily": color_family,
         "Color": row.get("zalora_color"),
         "Variation": variation,

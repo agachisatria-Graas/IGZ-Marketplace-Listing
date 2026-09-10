@@ -79,6 +79,27 @@ def combined_description(row):
     return main or long_
 
 
+def ensure_brand_prefix(title, brand):
+    """Makes sure `brand` appears at the very front of `title`. If the brand
+    already appears somewhere else in the title, it's moved to the front
+    rather than duplicated. If the title already starts with the brand
+    (case-insensitive), it's left as-is."""
+    title = str(title or "").strip()
+    brand = str(brand or "").strip()
+    if not brand:
+        return title
+    if not title:
+        return brand
+    if title.lower().startswith(brand.lower()):
+        return title
+    if brand.lower() in title.lower():
+        pattern = re.compile(re.escape(brand), re.IGNORECASE)
+        remainder = pattern.sub("", title, count=1)
+        remainder = re.sub(r"\s+", " ", remainder).strip(" -")
+        return f"{brand} {remainder}".strip()
+    return f"{brand} {title}"
+
+
 def parent_image_html_snippet(row):
     """Appended to the very end of Lazada's item description: an HTML image
     tag for the first Parent Image, in the exact format Agachi specified."""
@@ -244,7 +265,7 @@ def build_shopee_row(row, group):
 
     out = {
         "Seller SKU": row.get("sku"),
-        "Product Name": row.get("title"),
+        "Product Name": ensure_brand_prefix(row.get("title"), row.get("brand")),
         "Product Description 1": combined_description(row),
         "Total variation": total_variation or "",
         "Variation 1": var1,
@@ -294,7 +315,7 @@ def build_lazada_row(row, group):
 
     imgs = merged_images(row)
     specs = lazada_default_specs(row) + parse_specs(row.get("lazada_item_specifications"))
-    title = row.get("title") or ""
+    title = ensure_brand_prefix(row.get("title"), row.get("brand"))
 
     out = {
         "Seller SKU": row.get("sku"),
@@ -353,7 +374,7 @@ def build_tiktok_row(row, group):
     out = {
         "category": row.get("tiktok_category"),
         "brand": row.get("brand"),
-        "product_name": row.get("title"),
+        "product_name": ensure_brand_prefix(row.get("title"), row.get("brand")),
         "product_description": combined_description(row),
         "main_image": image_slots[0],
         "image_2": image_slots[1], "image_3": image_slots[2], "image_4": image_slots[3],
@@ -419,7 +440,7 @@ def build_zalora_row(row, group):
         "PrimaryCategory": row.get("zalora_category"),
         "Gender": row.get("zalora_gender"),
         "SubCatType": row.get("zalora_subcat_type"),
-        "Name": row.get("title"),
+        "Name": ensure_brand_prefix(row.get("title"), row.get("brand")),
         "ColorFamily": row.get("zalora_color_family"),
         "Color": row.get("zalora_color"),
         "Variation": variation,
