@@ -425,6 +425,7 @@ def build_lazada_row(row, group):
         "Product Image URL(s)": IMG_SEP.join(imgs),
         "Category ID": row.get("lazada_category_id"),
         "Brand": row.get("brand"),
+        "Tax Class": "default",
         "Warranty Type": "No Warranty",
         "Package Weight (kg)": parse_weight_kg(row.get("weight_kg")),
         "Package Height(cm)": to_number(row.get("height_cm")),
