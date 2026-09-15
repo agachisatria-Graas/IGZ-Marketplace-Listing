@@ -5,6 +5,7 @@ import pandas as pd
 import streamlit as st
 
 import mapping
+import hydro_flask_masterfile as hfm
 from ui_common import PLATFORM_LABELS, CATEGORY_SHEET_PLATFORM, file_bytes, rows_to_xlsx_bytes
 
 RAW_COLUMNS = [
@@ -84,9 +85,100 @@ def load_category_mapping_workbook(uploaded_file):
     return out, matched_sheets
 
 
+def _render_preview_and_downloads(raw_rows, platforms, zip_filename, key_prefix=""):
+    st.subheader("Preview & download")
+    tabs = st.tabs([PLATFORM_LABELS[p] for p in platforms])
+    outputs = {}
+
+    for tab, platform in zip(tabs, platforms):
+        with tab:
+            headers, out_rows = mapping.build_platform_rows(platform, raw_rows)
+            df_out = pd.DataFrame(out_rows, columns=headers)
+            outputs[platform] = (headers, out_rows)
+            st.dataframe(df_out, use_container_width=True, height=350)
+            file_data = rows_to_xlsx_bytes(platform, headers, out_rows)
+            st.download_button(
+                f"Download {PLATFORM_LABELS[platform]} file",
+                data=file_data,
+                file_name=f"{PLATFORM_LABELS[platform].replace(' ', '_')}_Listing_File.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key=f"dl_{key_prefix}_{platform}",
+            )
+
+    zip_buf = io.BytesIO()
+    with zipfile.ZipFile(zip_buf, "w") as zf:
+        for platform, (headers, out_rows) in outputs.items():
+            zf.writestr(
+                f"{PLATFORM_LABELS[platform].replace(' ', '_')}_Listing_File.xlsx",
+                rows_to_xlsx_bytes(platform, headers, out_rows),
+            )
+    zip_buf.seek(0)
+    st.divider()
+    st.download_button(
+        f"⬇️ Download all {len(platforms)} files as ZIP",
+        data=zip_buf.read(),
+        file_name=zip_filename,
+        mime="application/zip",
+        key=f"dl_{key_prefix}_zip",
+    )
+
+
+def _apply_category_mapping_with_warnings(raw_rows, uploaded_map, platforms):
+    """Shared by both modes: loads the category mapping file, applies it,
+    and shows the standard success/warning messages. Returns raw_rows
+    (possibly unchanged if no file was uploaded)."""
+    if uploaded_map is None:
+        st.warning(
+            "No category mapping file uploaded — every Category ID field will be "
+            "blank in the output. Upload one to auto-fill them."
+        )
+        return raw_rows
+
+    try:
+        category_sheets, matched_sheets = load_category_mapping_workbook(uploaded_map)
+    except Exception as e:
+        st.error(f"Couldn't read the category mapping file: {e}")
+        st.stop()
+    total_keywords = sum(len(v) for v in category_sheets.values())
+    st.success(
+        f"Loaded {total_keywords} keyword mapping(s) from sheet(s): "
+        + ", ".join(matched_sheets)
+    )
+    raw_rows = mapping.apply_title_category_mapping(raw_rows, category_sheets)
+    unmatched = {p: [] for p in mapping.PLATFORM_CATEGORY_FIELD}
+    for r in raw_rows:
+        for p, f in mapping.PLATFORM_CATEGORY_FIELD.items():
+            if not r.get(f):
+                unmatched[p].append(r.get("sku"))
+    for p, skus in unmatched.items():
+        if skus:
+            st.warning(
+                f"No {PLATFORM_LABELS[p]} category match (no keyword in "
+                f"the category mapping file matched these Titles, so their "
+                f"Category ID is blank): " + ", ".join(str(s) for s in skus)
+            )
+    return raw_rows
+
+
 def render():
     st.title("Hydro Flask Marketplace Listing Tool")
-    st.caption("Shopee · Lazada · TikTok Shop · Zalora Indonesia")
+    st.caption("Shopee · Lazada · TikTok Shop · Zalora Indonesia · Shopify")
+
+    mode = st.radio(
+        "How do you want to provide your item data?",
+        [
+            "Fill in the simple raw data template",
+            "Import my own Masterfile + Images + Category files",
+        ],
+    )
+
+    if mode.startswith("Fill in"):
+        _render_simple_template_mode()
+    else:
+        _render_masterfile_import_mode()
+
+
+def _render_simple_template_mode():
     st.write(
         "Upload one raw data file with all your items and variants, and get back "
         "ready-to-post files formatted for each marketplace."
@@ -126,90 +218,124 @@ def render():
 
     col1, col2 = st.columns(2)
     with col1:
-        uploaded = st.file_uploader("Upload your filled-in raw data file (.xlsx)", type=["xlsx"])
+        uploaded = st.file_uploader(
+            "Upload your filled-in raw data file (.xlsx)", type=["xlsx"], key="simple_raw_upload"
+        )
     with col2:
         uploaded_map = st.file_uploader(
             "Upload category mapping file (.xlsx) — needed to fill in Category IDs",
-            type=["xlsx"],
+            type=["xlsx"], key="simple_category_upload",
         )
 
-    if uploaded is not None:
-        try:
-            raw_rows = load_raw_file(uploaded)
-        except Exception as e:
-            st.error(f"Couldn't read the raw data file: {e}")
-            st.stop()
-
-        if not raw_rows:
-            st.warning("No data rows found. Make sure Seller SKUs are filled in.")
-            st.stop()
-
-        if uploaded_map is not None:
-            try:
-                category_sheets, matched_sheets = load_category_mapping_workbook(uploaded_map)
-            except Exception as e:
-                st.error(f"Couldn't read the category mapping file: {e}")
-                st.stop()
-            total_keywords = sum(len(v) for v in category_sheets.values())
-            st.success(
-                f"Loaded {total_keywords} keyword mapping(s) from sheet(s): "
-                + ", ".join(matched_sheets)
-            )
-            raw_rows = mapping.apply_title_category_mapping(raw_rows, category_sheets)
-            unmatched = {p: [] for p in mapping.PLATFORM_CATEGORY_FIELD}
-            for r in raw_rows:
-                for p, f in mapping.PLATFORM_CATEGORY_FIELD.items():
-                    if not r.get(f):
-                        unmatched[p].append(r.get("sku"))
-            for p, skus in unmatched.items():
-                if skus:
-                    st.warning(
-                        f"No {PLATFORM_LABELS[p]} category match (no keyword in "
-                        f"category_mapping_template.xlsx matched these Titles, so their "
-                        f"Category ID is blank): " + ", ".join(str(s) for s in skus)
-                    )
-        else:
-            st.warning(
-                "No category mapping file uploaded — every Category ID field will be "
-                "blank in the output. Upload one to auto-fill them."
-            )
-
-        st.success(f"Loaded {len(raw_rows)} SKU row(s) across "
-                   f"{len(mapping.group_rows_by_parent(raw_rows))} parent product(s).")
-
-        st.subheader("Preview & download")
-        tabs = st.tabs([PLATFORM_LABELS[p] for p in ["shopee", "lazada", "tiktok", "zalora"]])
-        outputs = {}
-
-        for tab, platform in zip(tabs, ["shopee", "lazada", "tiktok", "zalora"]):
-            with tab:
-                headers, out_rows = mapping.build_platform_rows(platform, raw_rows)
-                df_out = pd.DataFrame(out_rows, columns=headers)
-                outputs[platform] = (headers, out_rows)
-                st.dataframe(df_out, use_container_width=True, height=350)
-                file_data = rows_to_xlsx_bytes(platform, headers, out_rows)
-                st.download_button(
-                    f"Download {PLATFORM_LABELS[platform]} file",
-                    data=file_data,
-                    file_name=f"{PLATFORM_LABELS[platform].replace(' ', '_')}_Listing_File.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key=f"dl_{platform}",
-                )
-
-        zip_buf = io.BytesIO()
-        with zipfile.ZipFile(zip_buf, "w") as zf:
-            for platform, (headers, out_rows) in outputs.items():
-                zf.writestr(
-                    f"{PLATFORM_LABELS[platform].replace(' ', '_')}_Listing_File.xlsx",
-                    rows_to_xlsx_bytes(platform, headers, out_rows),
-                )
-        zip_buf.seek(0)
-        st.divider()
-        st.download_button(
-            "⬇️ Download all 4 files as ZIP",
-            data=zip_buf.read(),
-            file_name="marketplace_listing_files.zip",
-            mime="application/zip",
-        )
-    else:
+    if uploaded is None:
         st.info("Upload a filled-in raw data file to get started.")
+        return
+
+    try:
+        raw_rows = load_raw_file(uploaded)
+    except Exception as e:
+        st.error(f"Couldn't read the raw data file: {e}")
+        st.stop()
+
+    if not raw_rows:
+        st.warning("No data rows found. Make sure Seller SKUs are filled in.")
+        st.stop()
+
+    raw_rows = _apply_category_mapping_with_warnings(
+        raw_rows, uploaded_map, ["shopee", "lazada", "tiktok", "zalora"]
+    )
+
+    st.success(f"Loaded {len(raw_rows)} SKU row(s) across "
+               f"{len(mapping.group_rows_by_parent(raw_rows))} parent product(s).")
+
+    _render_preview_and_downloads(
+        raw_rows, ["shopee", "lazada", "tiktok", "zalora"],
+        "marketplace_listing_files.zip", key_prefix="simple",
+    )
+
+
+def _render_masterfile_import_mode():
+    st.write(
+        "Upload your own internal Masterfile, a combined-images file (the "
+        "same format the **Image Link Combiner** tool produces — a "
+        "'Lazada Images' sheet and a 'Zalora Images' sheet, each with SKU + "
+        "Combined Images columns), and a category mapping file — no need to "
+        "manually re-type anything into the simple template. This mode also "
+        "produces a **5th file: Shopify**."
+    )
+    st.caption(
+        "Matched by column label, not position, so a reordered Masterfile "
+        "export still works as long as the column headers (row 2) are the "
+        "same. Images and category IDs are matched by Seller SKU / Title, "
+        "same as the simple template mode."
+    )
+
+    with st.expander("⚠️ What this mode does NOT pull from your Masterfile", expanded=False):
+        st.write(
+            "- **Shipping Service, Item Specifications (Shopee/Lazada/TikTok)** — "
+            "not present in the Masterfile format, left blank (Shopee/Lazada's "
+            "Brand + Material specs still auto-fill from the existing default "
+            "rule). Add these afterward in the downloaded files if needed.\n"
+            "- **Zalora Sub Cat Type** — left blank (no source column).\n"
+            "- **Shopify Category ID** — reuses whatever Category ID Shopee's "
+            "keyword matching resolves, since Shopify doesn't have its own "
+            "category sheet.\n"
+            "- **Zalora Color Family** — passed through from the Masterfile's "
+            "own Color Family column as-is (not validated against Zalora's "
+            "18 accepted values, unlike the Herschel/Toms tools)."
+        )
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        uploaded_master = st.file_uploader(
+            "Upload your Masterfile (.xlsx)", type=["xlsx"], key="master_upload"
+        )
+    with col2:
+        uploaded_images = st.file_uploader(
+            "Upload combined images file (.xlsx)", type=["xlsx"], key="master_images_upload"
+        )
+    with col3:
+        uploaded_map = st.file_uploader(
+            "Upload category mapping file (.xlsx)", type=["xlsx"], key="master_category_upload"
+        )
+
+    if uploaded_master is None:
+        st.info("Upload your Masterfile to get started (images and category files are optional, but recommended).")
+        return
+
+    try:
+        raw_rows = hfm.parse_masterfile(uploaded_master)
+    except Exception as e:
+        st.error(f"Couldn't read the Masterfile: {e}")
+        st.stop()
+
+    if not raw_rows:
+        st.warning("No data rows found. Make sure Inventory Sku is filled in.")
+        st.stop()
+
+    if uploaded_images is not None:
+        try:
+            lazada_images, zalora_images = hfm.load_images_workbook(uploaded_images)
+        except Exception as e:
+            st.error(f"Couldn't read the images file: {e}")
+            st.stop()
+        raw_rows, unmatched_imgs = hfm.merge_images_into_rows(raw_rows, lazada_images, zalora_images)
+        st.success(f"Matched images for {len(raw_rows) - len(unmatched_imgs)} / {len(raw_rows)} SKU(s).")
+        if unmatched_imgs:
+            with st.expander(f"⚠️ No images matched for {len(unmatched_imgs)} SKU(s)"):
+                for s in unmatched_imgs:
+                    st.write(s)
+    else:
+        st.warning("No images file uploaded — Product Image URL(s) will be blank in every output.")
+
+    raw_rows = _apply_category_mapping_with_warnings(
+        raw_rows, uploaded_map, ["shopee", "lazada", "tiktok", "zalora", "shopify"]
+    )
+
+    st.success(f"Loaded {len(raw_rows)} SKU row(s) across "
+               f"{len(mapping.group_rows_by_parent(raw_rows))} parent product(s).")
+
+    _render_preview_and_downloads(
+        raw_rows, ["shopee", "lazada", "tiktok", "zalora", "shopify"],
+        "hydro_flask_masterfile_listing_files.zip", key_prefix="master",
+    )

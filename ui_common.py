@@ -13,6 +13,7 @@ from openpyxl.styles import Font, PatternFill, Alignment
 
 PLATFORM_LABELS = {
     "shopee": "Shopee", "lazada": "Lazada", "tiktok": "TikTok Shop", "zalora": "Zalora",
+    "shopify": "Shopify",
 }
 
 # Used by every brand's category-mapping-workbook loader to match a sheet

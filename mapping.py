@@ -466,11 +466,47 @@ def build_zalora_row(row, group):
 # top-level entry point
 # ---------------------------------------------------------------------------
 
+SHOPIFY_HEADERS = [
+    "Graas SKU", "Status", "Remarks", "Seller SKU", "Product Name",
+    "Product Description 1", "Product Description 2", "Product Description 3",
+    "Total variation", "Variation 1", "Variation 2", "Variation 3",
+    "RRP", "compare At Price", "Currency Code", "Quantity", "Category ID",
+    "Product Image URL(s)", "Weight (Kg)", "Vendor", "Product Type", "Taxable", "tags",
+]
+
+
+def build_shopify_row(row, group):
+    axes = variant_label(row)
+    total_variation = len(axes) if len(group) > 1 else 0
+    var1 = f"{axes[0][0]}:{axes[0][1]}" if len(axes) >= 1 and total_variation else ""
+    var2 = f"{axes[1][0]}:{axes[1][1]}" if len(axes) >= 2 and total_variation else ""
+
+    imgs = merged_images(row)
+
+    out = {
+        "Seller SKU": row.get("sku"),
+        "Product Name": ensure_brand_prefix(row.get("title"), row.get("brand")),
+        "Product Description 1": script_description(row),
+        "Total variation": total_variation or "",
+        "Variation 1": var1,
+        "Variation 2": var2,
+        "RRP": to_number(row.get("price")),
+        "Currency Code": "IDR",
+        "Quantity": 0,
+        "Category ID": row.get("shopee_category_id"),
+        "Product Image URL(s)": IMG_SEP.join(imgs),
+        "Weight (Kg)": to_number(row.get("weight_kg")),
+        "Vendor": row.get("brand"),
+    }
+    return [out.get(h, "") for h in SHOPIFY_HEADERS]
+
+
 BUILDERS = {
     "shopee": (SHOPEE_HEADERS, build_shopee_row),
     "lazada": (LAZADA_HEADERS, build_lazada_row),
     "tiktok": (TIKTOK_HEADERS, build_tiktok_row),
     "zalora": (ZALORA_HEADERS, build_zalora_row),
+    "shopify": (SHOPIFY_HEADERS, build_shopify_row),
 }
 
 

@@ -43,6 +43,45 @@ import + one tab line in `app.py`. See "Adding a new brand" at the bottom.
   `IGZ_Toms_category_sheet.xlsx`-style file directly instead).
 - `build_template.py` / `build_herschel_template.py` / `build_toms_template.py`
   — regenerate the respective pair of templates if you want to tweak them.
+- `hydro_flask_masterfile.py` — parses Agachi's own internal Masterfile
+  format directly (instead of the simple raw_data_template.xlsx) and merges
+  in images from a combined-images lookup file. See "Masterfile import mode"
+  below.
+
+## Masterfile import mode (Hydro Flask tab only, for now)
+
+The Hydro Flask tab has a mode switch at the top:
+
+1. **Fill in the simple raw data template** — the original workflow,
+   documented above.
+2. **Import my own Masterfile + Images + Category files** — upload your
+   real internal Masterfile directly (matched by column label, not
+   position, from row 2's headers), a combined-images file in the exact
+   format the **Image Link Combiner** tool produces (a "Lazada Images"
+   sheet and a "Zalora Images" sheet, each with SKU + Combined Images
+   columns — images are matched to rows by SKU), and a category mapping
+   file. No manual re-typing into the simple template needed.
+
+This mode produces **5 files** instead of 4 — Shopee, Lazada, TikTok,
+Zalora, and **Shopify** (`mapping.py`'s `build_shopify_row()` / `SHOPIFY_HEADERS`).
+
+What this mode does automatically:
+- Style Name → Title (already fully formed in the Masterfile, brand + style
+  + size + color, so no reconstruction needed).
+- Comma-decimal numbers (e.g. `18,11` for a width) are converted to `18.11`.
+- Color/Size become Variant Value 1/2 automatically.
+- Category IDs still come from the same keyword-in-title category mapping
+  file as the simple template mode — the Masterfile's own category-text
+  columns aren't used, since the existing matching logic already works
+  off Title text.
+
+What it does NOT pull from the Masterfile (left blank or defaulted — see
+the in-app "What this mode does NOT pull" note for the full list): Shipping
+Service, Item Specifications beyond the automatic Brand+Material defaults,
+Zalora Sub Cat Type, and Zalora Color Family isn't validated against
+Zalora's 18 accepted values (unlike Herschel/Toms' image-based
+classification). Shopify's Category ID reuses whatever Shopee's matching
+resolves, since Shopify has no category sheet of its own.
 
 ## Herschel tool — how it differs from Hydro Flask's
 
