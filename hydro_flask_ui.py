@@ -160,6 +160,24 @@ def _apply_category_mapping_with_warnings(raw_rows, uploaded_map, platforms):
     return raw_rows
 
 
+def _resolve_colors_with_warning(raw_rows):
+    """Shared by both modes: runs Zalora ColorFamily classification (keyword
+    match on Color first, image-based fallback), and flags any SKU it
+    couldn't resolve. Returns the updated raw_rows."""
+    with st.spinner("Classifying Zalora color families..."):
+        raw_rows, unresolved_colors = mapping.resolve_color_families(raw_rows)
+    if unresolved_colors:
+        with st.expander(f"⚠️ Zalora ColorFamily couldn't be determined for {len(unresolved_colors)} SKU(s) — left blank"):
+            st.write(
+                "The Color name didn't match any recognizable keyword, and "
+                "no Zalora image could be fetched/classified either. Fill "
+                "these in by hand in the downloaded file if needed:"
+            )
+            for s in unresolved_colors:
+                st.write(s)
+    return raw_rows
+
+
 def render():
     st.title("Hydro Flask Marketplace Listing Tool")
     st.caption("Shopee · Lazada · TikTok Shop · Zalora Indonesia · Shopify")
@@ -245,6 +263,8 @@ def _render_simple_template_mode():
         raw_rows, uploaded_map, ["shopee", "lazada", "tiktok", "zalora"]
     )
 
+    raw_rows = _resolve_colors_with_warning(raw_rows)
+
     st.success(f"Loaded {len(raw_rows)} SKU row(s) across "
                f"{len(mapping.group_rows_by_parent(raw_rows))} parent product(s).")
 
@@ -281,9 +301,10 @@ def _render_masterfile_import_mode():
             "- **Shopify Category ID** — reuses whatever Category ID Shopee's "
             "keyword matching resolves, since Shopify doesn't have its own "
             "category sheet.\n"
-            "- **Zalora Color Family** — passed through from the Masterfile's "
-            "own Color Family column as-is (not validated against Zalora's "
-            "18 accepted values, unlike the Herschel/Toms tools)."
+            "- **Zalora Color Family** — the Masterfile's own Color Family "
+            "column is ignored; it's auto-classified the same way as the "
+            "Herschel/Toms tools (keyword match on Color first, image-based "
+            "fallback), so it's always one of Zalora's 18 accepted values."
         )
 
     col1, col2, col3 = st.columns(3)
@@ -332,6 +353,8 @@ def _render_masterfile_import_mode():
     raw_rows = _apply_category_mapping_with_warnings(
         raw_rows, uploaded_map, ["shopee", "lazada", "tiktok", "zalora", "shopify"]
     )
+
+    raw_rows = _resolve_colors_with_warning(raw_rows)
 
     st.success(f"Loaded {len(raw_rows)} SKU row(s) across "
                f"{len(mapping.group_rows_by_parent(raw_rows))} parent product(s).")

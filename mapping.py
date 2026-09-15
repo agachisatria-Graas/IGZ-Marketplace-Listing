@@ -7,10 +7,118 @@ Kept separate from the Streamlit UI (app.py) so it can be unit-tested
 on its own.
 """
 import html
+import io
 import re
 from collections import OrderedDict, defaultdict
 
+import requests
+from PIL import Image
+
 IMG_SEP = " ; "
+
+
+# ---------------------------------------------------------------------------
+# Zalora ColorFamily: image-based classification first, keyword fallback
+# (same approach as the Herschel/Toms tools — same 18 Zalora-accepted
+# families).
+# ---------------------------------------------------------------------------
+
+FAMILY_RGB = {
+    "black": (20, 20, 20), "grey": (140, 140, 140), "white": (245, 245, 245),
+    "red": (190, 30, 40), "pink": (240, 150, 180), "orange": (225, 120, 40),
+    "yellow": (225, 195, 60), "green": (60, 120, 60), "blue": (50, 90, 170),
+    "purple": (110, 60, 140), "turquoise": (55, 180, 170), "bronze": (140, 100, 60),
+    "lilac purple": (170, 140, 190), "silver": (190, 190, 195), "beige": (210, 180, 140),
+    "gold": (190, 160, 70), "navy": (25, 35, 70), "brown": (90, 60, 40),
+}
+
+KEYWORD_TO_FAMILY = [
+    ("lilac", "lilac purple"), ("navy", "navy"), ("turquoise", "turquoise"), ("teal", "turquoise"),
+    ("black", "black"), ("grey", "grey"), ("gray", "grey"),
+    ("cream", "white"), ("ivory", "white"), ("white", "white"),
+    ("burgundy", "red"), ("maroon", "red"), ("crimson", "red"), ("wine", "red"), ("red", "red"),
+    ("fuchsia", "pink"), ("blush", "pink"), ("rose", "pink"), ("pink", "pink"),
+    ("rust", "orange"), ("coral", "orange"), ("orange", "orange"),
+    ("mustard", "yellow"), ("lemon", "yellow"), ("yellow", "yellow"),
+    ("olive", "green"), ("sage", "green"), ("mint", "green"), ("forest", "green"),
+    ("mermaid", "green"), ("palmer", "green"), ("agave", "green"), ("green", "green"),
+    ("denim", "blue"), ("cobalt", "blue"), ("sky", "blue"), ("surf", "blue"), ("blue", "blue"),
+    ("violet", "purple"), ("plum", "purple"), ("purple", "purple"),
+    ("bronze", "bronze"), ("silver", "silver"),
+    ("camel", "beige"), ("stone", "beige"), ("nude", "beige"), ("khaki", "beige"),
+    ("sand", "beige"), ("tan", "beige"), ("cobblestone", "beige"), ("natural", "beige"),
+    ("birch", "beige"), ("oat", "beige"), ("beige", "beige"),
+    ("gold", "gold"),
+    ("chocolate", "brown"), ("coffee", "brown"), ("espresso", "brown"),
+    ("mocha", "brown"), ("chestnut", "brown"), ("brown", "brown"),
+]
+
+
+def classify_color_by_keyword(color_name):
+    if not color_name:
+        return None
+    name_l = str(color_name).lower()
+    for kw, family in KEYWORD_TO_FAMILY:
+        if kw in name_l:
+            return family
+    return None
+
+
+def _nearest_family(rgb):
+    r, g, b = rgb
+    best, best_dist = None, float("inf")
+    for family, (fr, fg, fb) in FAMILY_RGB.items():
+        dist = (r - fr) ** 2 + (g - fg) ** 2 + (b - fb) ** 2
+        if dist < best_dist:
+            best_dist, best = dist, family
+    return best
+
+
+def classify_color_by_image(url, timeout=6):
+    """Fetches `url`, averages the center ~30% of the image (to avoid
+    whitespace product-shot borders), and returns the nearest color family.
+    Returns None on any failure (bad URL, network error, unreadable image)."""
+    try:
+        resp = requests.get(url, timeout=timeout)
+        resp.raise_for_status()
+        img = Image.open(io.BytesIO(resp.content)).convert("RGB")
+        img = img.resize((50, 50))
+        crop = img.crop((17, 17, 33, 33))
+        pixels = list(crop.getdata())
+        if not pixels:
+            return None
+        n = len(pixels)
+        avg = (
+            sum(p[0] for p in pixels) / n,
+            sum(p[1] for p in pixels) / n,
+            sum(p[2] for p in pixels) / n,
+        )
+        return _nearest_family(avg)
+    except Exception:
+        return None
+
+
+def resolve_color_families(rows):
+    """Adds 'zalora_color_family_resolved' to each row: tries a keyword
+    match on the Color name FIRST (reliable for descriptive names, and
+    immune to the multi-tone-averaging problem image classification has),
+    falling back to the first Zalora image's dominant color only when the
+    name itself gives no clue. Returns (new_rows, unresolved_skus).
+    Does not mutate the input."""
+    out = []
+    unresolved = []
+    for r in rows:
+        r2 = dict(r)
+        family = classify_color_by_keyword(r.get("zalora_color"))
+        if not family:
+            imgs = zalora_image_list(r)
+            if imgs:
+                family = classify_color_by_image(imgs[0])
+        r2["zalora_color_family_resolved"] = family or ""
+        if not family:
+            unresolved.append(r.get("sku"))
+        out.append(r2)
+    return out, unresolved
 
 
 # ---------------------------------------------------------------------------
@@ -452,7 +560,7 @@ def build_zalora_row(row, group):
         "Gender": row.get("zalora_gender"),
         "SubCatType": "Sports Metal Water Bottles",
         "Name": ensure_brand_prefix(row.get("title"), row.get("brand")),
-        "ColorFamily": row.get("zalora_color_family"),
+        "ColorFamily": row.get("zalora_color_family_resolved", ""),
         "Sizesystembrand": "International",
         "Color": row.get("zalora_color"),
         "Variation": "One Size",
