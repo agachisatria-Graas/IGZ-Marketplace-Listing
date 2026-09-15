@@ -276,7 +276,7 @@ def build_shopee_row(row, group):
         "Quantity": 0,
         "Product Image URL(s)": IMG_SEP.join(imgs),
         "Category ID": row.get("shopee_category_id"),
-        "Shipping Service Details": row.get("shopee_shipping_service"),
+        "Shipping Service Details": "Reguler (Cashless):18000.00, Hemat:18000.00, Agen Shopee:18000.00, Shopee Xpress Point:18000.00, Instant:18000.00",
         "Weight (Kg)": to_number(row.get("weight_kg")),
         "Package Length(cm)": to_number(row.get("length_cm")),
         "Package Width(cm)": to_number(row.get("width_cm")),
@@ -352,56 +352,64 @@ def build_lazada_row(row, group):
 # ---------------------------------------------------------------------------
 
 TIKTOK_HEADERS = [
-    "category", "brand", "product_name", "product_description",
-    "main_image", "image_2", "image_3", "image_4", "image_5", "image_6", "image_7",
-    "image_8", "image_9",
-    "property_name_1", "property_value_1", "property_1_image",
-    "property_name_2", "property_value_2",
-    "parcel_weight", "parcel_length", "parcel_width", "parcel_height",
-    "price", "quantity", "seller_sku",
-] + [f"Specification {i}" for i in range(1, 11)]
+    "Kategori", "Merek", "Nama produk", "Deskripsi produk",
+    "Gambar utama", "Gambar 2", "Gambar 3", "Gambar 4", "Gambar 5", "Gambar 6", "Gambar 7",
+    "Gambar Produk 8", "Gambar Produk 9",
+    "Nama varian utama (tema)", "Nilai varian utama (opsi)", "Gambar varian utama 1",
+    "Nama varian sekunder (tema)", "Nilai varian sekunder (opsi)",
+    "Berat paket(g)", "Panjang paket(cm)", "Lebar paket(cm)", "Tinggi paket(cm)",
+    "Opsi Pengiriman", "Harga Ritel (Mata Uang Lokal)", "Pre-sale: Waktu proses pesanan",
+    "Kuantitas", "SKU Penjual", "Pembelian minimum per pesanan", "Bagan Ukuran",
+    "Pilih apakah akan mendukung pembayaran di tempat.", "Asuransi pengiriman",
+    "Produk lelang", "Tawaran awal",
+    "Pola", "Volume", "Gaya", "Fitur", "Bahan", "Magnet", "Teknik Produksi",
+    "Usia", "Baterai", "Bebas BPA",
+]
+TIKTOK_NAMED_ATTRIBUTE_COLUMNS = [
+    "Pola", "Volume", "Gaya", "Fitur", "Bahan", "Magnet", "Teknik Produksi",
+    "Usia", "Baterai", "Bebas BPA",
+]
 
 
 def build_tiktok_row(row, group):
     axes = variant_label(row)
-    all_imgs = merged_images(row)
-    # main + up to 8 more parent-level images
     parent_imgs = split_images(row.get("parent_images"))
     image_slots = (parent_imgs + [""] * 9)[:9]
     variant_imgs = split_images(row.get("variant_images"))
     property_1_image = variant_imgs[0] if variant_imgs else ""
 
     out = {
-        "category": row.get("tiktok_category"),
-        "brand": row.get("brand"),
-        "product_name": ensure_brand_prefix(row.get("title"), row.get("brand")),
-        "product_description": combined_description(row),
-        "main_image": image_slots[0],
-        "image_2": image_slots[1], "image_3": image_slots[2], "image_4": image_slots[3],
-        "image_5": image_slots[4], "image_6": image_slots[5], "image_7": image_slots[6],
-        "image_8": image_slots[7], "image_9": image_slots[8],
-        "property_name_1": axes[0][0] if len(axes) >= 1 else "",
-        "property_value_1": axes[0][1] if len(axes) >= 1 else "",
-        "property_1_image": property_1_image,
-        "property_name_2": axes[1][0] if len(axes) >= 2 else "",
-        "property_value_2": axes[1][1] if len(axes) >= 2 else "",
-        "parcel_weight": to_number(row.get("weight_kg")) * 1000,  # kg -> g
-        "parcel_length": to_number(row.get("length_cm")),
-        "parcel_width": to_number(row.get("width_cm")),
-        "parcel_height": to_number(row.get("height_cm")),
-        "price": to_number(row.get("price")),
-        "quantity": 0,
-        "seller_sku": row.get("sku"),
+        "Kategori": row.get("tiktok_category"),
+        "Merek": row.get("brand"),
+        "Nama produk": ensure_brand_prefix(row.get("title"), row.get("brand")),
+        "Deskripsi produk": combined_description(row),
+        "Gambar utama": image_slots[0],
+        "Gambar 2": image_slots[1], "Gambar 3": image_slots[2], "Gambar 4": image_slots[3],
+        "Gambar 5": image_slots[4], "Gambar 6": image_slots[5], "Gambar 7": image_slots[6],
+        "Gambar Produk 8": image_slots[7], "Gambar Produk 9": image_slots[8],
+        "Nama varian utama (tema)": axes[0][0] if len(axes) >= 1 else "",
+        "Nilai varian utama (opsi)": axes[0][1] if len(axes) >= 1 else "",
+        "Gambar varian utama 1": property_1_image,
+        "Nama varian sekunder (tema)": axes[1][0] if len(axes) >= 2 else "",
+        "Nilai varian sekunder (opsi)": axes[1][1] if len(axes) >= 2 else "",
+        "Berat paket(g)": to_number(row.get("weight_kg")) * 1000,  # kg -> g
+        "Panjang paket(cm)": to_number(row.get("length_cm")),
+        "Lebar paket(cm)": to_number(row.get("width_cm")),
+        "Tinggi paket(cm)": to_number(row.get("height_cm")),
+        "Harga Ritel (Mata Uang Lokal)": to_number(row.get("price")),
+        "Kuantitas": 0,
+        "SKU Penjual": row.get("sku"),
+        "Bahan": default_material(row.get("title")),
     }
-    # NOTE: TikTok's real bulk template names these columns "product_property/<id>",
-    # a numeric attribute ID that's specific to the chosen category and only known
-    # inside TikTok Shop Seller Centre. We can't reliably guess those IDs, so specs
-    # are written to generic "Specification N" columns instead — copy the values
-    # into the correct product_property/<id> columns in the official template
-    # before uploading.
+    # A manually-typed spec whose key matches one of the named attribute
+    # columns above (case-insensitive) lands directly in that column —
+    # overriding the automatic "Bahan" value above if explicitly given.
     specs = parse_specs(row.get("tiktok_item_specifications"))
-    for i, (k, v) in enumerate(specs[:10], start=1):
-        out[f"Specification {i}"] = f"{k}={v}"
+    lower_to_col = {c.lower(): c for c in TIKTOK_NAMED_ATTRIBUTE_COLUMNS}
+    for k, v in specs:
+        col = lower_to_col.get(str(k).strip().lower())
+        if col:
+            out[col] = v
     return [out.get(h, "") for h in TIKTOK_HEADERS]
 
 
@@ -411,18 +419,21 @@ def build_tiktok_row(row, group):
 
 ZALORA_HEADERS = [
     "SkuSupplierConfig", "ParentSku", "SellerSku", "Brand", "PrimaryCategory", "Gender",
-    "SubCatType", "Name", "ColorFamily", "Color", "Sizesystembrand", "Variation", "Quantity", "Price",
-    "Description", "CareLabel", "Material",
-    "BoxHeightSimple", "BoxLengthSimple", "BoxWidthSimple", "WeightSimple",
-    "MainImage", "Image2", "Image3", "Image4", "Image5", "Image6", "Image7", "Image8",
-    "ProductGroup",
+    "SubCatType", "BrowseNodes", "Name", "ColorFamily", "Color", "IsSample", "Sizesystembrand",
+    "Variation", "AgeGroup", "Quantity", "Price", "SalePrice", "SaleStartDate", "SaleEndDate",
+    "Model", "Description", "CareLabel", "Measurements", "Modeiswearing",
+    "Modelbodymeasurements", "Year", "Season", "Material", "Range", "FrameColor",
+    "FrameShape", "LensColor", "UpperMaterial", "InnerMaterial", "SoleMaterial",
+    "InnerSoleMaterial", "VideoLink", "TechnicalFeatures", "Care", "LeatherType",
+    "HexColor", "SkincareIngredients", "SkinFaceFormula", "SkinType", "SkincareConcerns",
+    "HairType", "FaceFinish", "FaceCoverage", "EarthEditTag", "EarthEditCriteria",
+    "EarthEditProof", "Condition", "BoxHeightSimple", "BoxLengthSimple", "BoxWidthSimple",
+    "WeightSimple", "Activity", "PickedByEditor", "MainImage", "Image2", "Image3", "Image4",
+    "Image5", "Image6", "Image7", "Image8", "ProductGroup",
 ]
 
 
 def build_zalora_row(row, group):
-    axes = variant_label(row)
-    variation = ", ".join(f"{v}" for _, v in axes) if axes else "One Size"
-
     imgs = zalora_image_list(row)
     image_slots = (imgs + [""] * 8)[:8]
     all_specs = (
@@ -439,12 +450,12 @@ def build_zalora_row(row, group):
         "Brand": row.get("brand"),
         "PrimaryCategory": row.get("zalora_category"),
         "Gender": row.get("zalora_gender"),
-        "SubCatType": row.get("zalora_subcat_type"),
+        "SubCatType": "Sports Metal Water Bottles",
         "Name": ensure_brand_prefix(row.get("title"), row.get("brand")),
         "ColorFamily": row.get("zalora_color_family"),
         "Sizesystembrand": "International",
         "Color": row.get("zalora_color"),
-        "Variation": variation,
+        "Variation": "One Size",
         "Quantity": 0,
         "Price": to_number(row.get("price")),
         "Description": script_description(row),
@@ -498,6 +509,7 @@ def build_shopify_row(row, group):
         "Weight (Kg)": to_number(row.get("weight_kg")),
         "Vendor": row.get("brand"),
     }
+    out["Product Type"] = out.get("tags", "")
     return [out.get(h, "") for h in SHOPIFY_HEADERS]
 
 
