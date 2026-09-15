@@ -278,6 +278,7 @@ PLATFORM_CATEGORY_FIELD = {
     "lazada": "lazada_category_id",
     "tiktok": "tiktok_category",
     "zalora": "zalora_category",
+    "shopify": "shopify_category_id",
 }
 
 
@@ -496,10 +497,10 @@ def build_tiktok_row(row, group):
         "Gambar 5": image_slots[4], "Gambar 6": image_slots[5], "Gambar 7": image_slots[6],
         "Gambar Produk 8": image_slots[7], "Gambar Produk 9": image_slots[8],
         "Nama varian utama (tema)": axes[0][0] if len(axes) >= 1 else "",
-        "Nilai varian utama (opsi)": axes[0][1] if len(axes) >= 1 else "",
+        "Nilai varian utama (opsi)": str(axes[0][1]).title() if len(axes) >= 1 else "",
         "Gambar varian utama 1": property_1_image,
-        "Nama varian sekunder (tema)": axes[1][0] if len(axes) >= 2 else "",
-        "Nilai varian sekunder (opsi)": axes[1][1] if len(axes) >= 2 else "",
+        "Nama varian sekunder (tema)": "",
+        "Nilai varian sekunder (opsi)": "",
         "Berat paket(g)": to_number(row.get("weight_kg")) * 1000,  # kg -> g
         "Panjang paket(cm)": to_number(row.get("length_cm")),
         "Lebar paket(cm)": to_number(row.get("width_cm")),
@@ -612,10 +613,11 @@ def build_shopify_row(row, group):
         "RRP": to_number(row.get("price")),
         "Currency Code": "IDR",
         "Quantity": 0,
-        "Category ID": row.get("shopee_category_id"),
+        "Category ID": row.get("shopify_category_id"),
         "Product Image URL(s)": IMG_SEP.join(imgs),
         "Weight (Kg)": to_number(row.get("weight_kg")),
         "Vendor": row.get("brand"),
+        "tags": row.get("shopify_category_id"),
     }
     out["Product Type"] = out.get("tags", "")
     return [out.get(h, "") for h in SHOPIFY_HEADERS]

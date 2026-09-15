@@ -20,6 +20,7 @@ PLATFORM_LABELS = {
 # name (e.g. "Shopee Category", "Lazada category") to a platform key.
 CATEGORY_SHEET_PLATFORM = {
     "shopee": "shopee", "lazada": "lazada", "tiktok": "tiktok", "zalora": "zalora",
+    "shopify": "shopify",
 }
 
 
