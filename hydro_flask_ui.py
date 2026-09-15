@@ -272,11 +272,12 @@ def _render_masterfile_import_mode():
 
     with st.expander("⚠️ What this mode does NOT pull from your Masterfile", expanded=False):
         st.write(
-            "- **Shipping Service, Item Specifications (Shopee/Lazada/TikTok)** — "
-            "not present in the Masterfile format, left blank (Shopee/Lazada's "
-            "Brand + Material specs still auto-fill from the existing default "
-            "rule). Add these afterward in the downloaded files if needed.\n"
-            "- **Zalora Sub Cat Type** — left blank (no source column).\n"
+            "- **Item Specifications (Shopee/Lazada/TikTok)** — not present "
+            "in the Masterfile format, left blank beyond the automatic "
+            "Brand + Material defaults. Shopee's Shipping Service Details "
+            "and Zalora's SubCatType are fixed hardcoded values (not from "
+            "the Masterfile), same as the simple template mode. Add any "
+            "other specs afterward in the downloaded files if needed.\n"
             "- **Shopify Category ID** — reuses whatever Category ID Shopee's "
             "keyword matching resolves, since Shopify doesn't have its own "
             "category sheet.\n"
