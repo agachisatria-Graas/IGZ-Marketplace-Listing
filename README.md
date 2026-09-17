@@ -43,45 +43,61 @@ import + one tab line in `app.py`. See "Adding a new brand" at the bottom.
   `IGZ_Toms_category_sheet.xlsx`-style file directly instead).
 - `build_template.py` / `build_herschel_template.py` / `build_toms_template.py`
   — regenerate the respective pair of templates if you want to tweak them.
-- `hydro_flask_masterfile.py` — parses Agachi's own internal Masterfile
-  format directly (instead of the simple raw_data_template.xlsx) and merges
-  in images from a combined-images lookup file. See "Masterfile import mode"
-  below.
+- `hydro_flask_masterfile.py` / `herschel_masterfile.py` — each parses that
+  brand's own internal Masterfile format directly (instead of the simple
+  raw_data_template.xlsx) and merges in images from a combined-images
+  lookup file. See "Masterfile import mode" below.
 
-## Masterfile import mode (Hydro Flask tab only, for now)
+## Masterfile import mode (Hydro Flask and Herschel tabs)
 
-The Hydro Flask tab has a mode switch at the top:
+Both tabs have a mode switch at the top:
 
 1. **Fill in the simple raw data template** — the original workflow,
    documented above.
 2. **Import my own Masterfile + Images + Category files** — upload your
    real internal Masterfile directly (matched by column label, not
-   position, from row 2's headers), a combined-images file in the exact
-   format the **Image Link Combiner** tool produces (a "Lazada Images"
-   sheet and a "Zalora Images" sheet, each with SKU + Combined Images
-   columns — images are matched to rows by SKU), and a category mapping
-   file. No manual re-typing into the simple template needed.
+   position), a combined-images file in the exact format the **Image Link
+   Combiner** tool produces (a "Lazada Images" sheet and a "Zalora Images"
+   sheet, each with SKU + Combined Images columns — images are matched to
+   rows by SKU), and a category mapping file. No manual re-typing into the
+   simple template needed.
 
 This mode produces **5 files** instead of 4 — Shopee, Lazada, TikTok,
-Zalora, and **Shopify** (`mapping.py`'s `build_shopify_row()` / `SHOPIFY_HEADERS`).
+Zalora, and **Shopify** (`build_shopify_row()` / `SHOPIFY_HEADERS` in
+`mapping.py` and `herschel_mapping.py` respectively — each tool has its
+own, since the real Shopify templates differ slightly between accounts).
 
-What this mode does automatically:
-- Style Name → Title (already fully formed in the Masterfile, brand + style
-  + size + color, so no reconstruction needed).
+What this mode does automatically, for both brands:
 - Comma-decimal numbers (e.g. `18,11` for a width) are converted to `18.11`.
 - Color/Size become Variant Value 1/2 automatically.
-- Category IDs still come from the same keyword-in-title category mapping
-  file as the simple template mode — the Masterfile's own category-text
-  columns aren't used, since the existing matching logic already works
-  off Title text.
+- Category IDs still come from the same category mapping file and matching
+  rule as the simple template mode (keyword-in-title for Hydro Flask, exact
+  Product Type+Specific Category+Gender match for Herschel) — the
+  Masterfile's own category-text columns aren't used for this.
+- Zalora ColorFamily is classified the same way for both (keyword match on
+  Color first, image-based fallback) — the Masterfile's own Color Family
+  column is ignored, since it isn't reliably one of Zalora's 18 accepted
+  values.
 
-What it does NOT pull from the Masterfile (left blank or defaulted — see
-the in-app "What this mode does NOT pull" note for the full list): Shipping
-Service, Item Specifications beyond the automatic Brand+Material defaults,
-Zalora Sub Cat Type, and Zalora Color Family isn't validated against
-Zalora's 18 accepted values (unlike Herschel/Toms' image-based
-classification). Shopify's Category ID reuses whatever Shopee's matching
-resolves, since Shopify has no category sheet of its own.
+Hydro Flask specifics: Style Name is already a fully-formed Title (brand +
+style + size + color), so it's used as-is. Shopify's Category ID/tags/
+Product Type all come from the category mapping file's dedicated **Shopify
+Category** sheet (same keyword-in-title matching as the other 4 platforms).
+
+Herschel specifics: Title comes from the Masterfile's Generic Item Name
+column (brand is prepended automatically if not already present). Shopify's
+**tags** comes straight from the Masterfile's own "Tags (\*if for Shopify
+Listing)" column, and **Product Type** from the Masterfile's own Product
+Type column (BAGS/ACCESSORY) — these two don't mirror each other like
+Hydro Flask's do, since better source data already exists in Herschel's
+Masterfile. Shopify Category ID is left blank (no clear source yet). The
+Masterfile's second description column has no header label in its own
+file, so only Main Description\* is captured — Main Description 2 isn't
+pulled in.
+
+See each tab's in-app "What this mode does NOT pull from your Masterfile"
+note for the complete, current list of gaps — check there first, since
+it's kept up to date as fields get added.
 
 ## Herschel tool — how it differs from Hydro Flask's
 

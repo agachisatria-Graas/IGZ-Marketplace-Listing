@@ -5,6 +5,7 @@ import pandas as pd
 import streamlit as st
 
 import herschel_mapping
+import herschel_masterfile as hmf
 from ui_common import PLATFORM_LABELS, CATEGORY_SHEET_PLATFORM, file_bytes, rows_to_xlsx_bytes
 
 HERSCHEL_RAW_COLUMNS = [
@@ -86,9 +87,113 @@ def load_herschel_category_mapping_workbook(uploaded_file):
     return out, matched_sheets
 
 
+def _render_preview_and_downloads(raw_rows, platforms, zip_filename, key_prefix=""):
+    st.subheader("Preview & download")
+    tabs = st.tabs([PLATFORM_LABELS[p] for p in platforms])
+    outputs = {}
+
+    for tab, platform in zip(tabs, platforms):
+        with tab:
+            headers, out_rows = herschel_mapping.build_platform_rows(platform, raw_rows)
+            df_out = pd.DataFrame(out_rows, columns=headers)
+            outputs[platform] = (headers, out_rows)
+            st.dataframe(df_out, use_container_width=True, height=350)
+            file_data = rows_to_xlsx_bytes(platform, headers, out_rows)
+            st.download_button(
+                f"Download {PLATFORM_LABELS[platform]} file",
+                data=file_data,
+                file_name=f"Herschel_{PLATFORM_LABELS[platform].replace(' ', '_')}_Listing_File.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key=f"dl_{key_prefix}_{platform}",
+            )
+
+    zip_buf = io.BytesIO()
+    with zipfile.ZipFile(zip_buf, "w") as zf:
+        for platform, (headers, out_rows) in outputs.items():
+            zf.writestr(
+                f"Herschel_{PLATFORM_LABELS[platform].replace(' ', '_')}_Listing_File.xlsx",
+                rows_to_xlsx_bytes(platform, headers, out_rows),
+            )
+    zip_buf.seek(0)
+    st.divider()
+    st.download_button(
+        f"⬇️ Download all {len(platforms)} files as ZIP",
+        data=zip_buf.read(),
+        file_name=zip_filename,
+        mime="application/zip",
+        key=f"dl_{key_prefix}_zip",
+    )
+
+
+def _apply_category_mapping_with_warnings(raw_rows, uploaded_map):
+    if uploaded_map is None:
+        st.warning(
+            "No category mapping file uploaded — every Category ID field will "
+            "be blank in the output. Upload one to auto-fill them."
+        )
+        return raw_rows
+
+    try:
+        category_sheets, matched_sheets = load_herschel_category_mapping_workbook(uploaded_map)
+    except Exception as e:
+        st.error(f"Couldn't read the category mapping file: {e}")
+        st.stop()
+    total_entries = sum(len(v) for v in category_sheets.values())
+    st.success(
+        f"Loaded {total_entries} category mapping row(s) from sheet(s): "
+        + ", ".join(matched_sheets)
+    )
+    raw_rows = herschel_mapping.apply_exact_category_mapping(raw_rows, category_sheets)
+    unmatched = {p: [] for p in herschel_mapping.PLATFORM_CATEGORY_FIELD}
+    for r in raw_rows:
+        for p, f in herschel_mapping.PLATFORM_CATEGORY_FIELD.items():
+            if not r.get(f):
+                unmatched[p].append(r.get("sku"))
+    for p, skus in unmatched.items():
+        if skus:
+            st.warning(
+                f"No {PLATFORM_LABELS[p]} category match (Product Type + "
+                f"Specific Category + Gender didn't exactly match any row in "
+                f"the category mapping file) for: " + ", ".join(str(s) for s in skus)
+            )
+    return raw_rows
+
+
+def _resolve_colors_with_warning(raw_rows):
+    with st.spinner("Classifying Zalora color families from images..."):
+        raw_rows, unresolved_colors = herschel_mapping.resolve_color_families(raw_rows)
+    if unresolved_colors:
+        with st.expander(f"⚠️ Zalora ColorFamily couldn't be determined for {len(unresolved_colors)} SKU(s) — left blank"):
+            st.write(
+                "No Zalora image could be fetched/classified, and the Color "
+                "name didn't match any recognizable keyword either. Fill "
+                "these in by hand in the downloaded file if needed:"
+            )
+            for s in unresolved_colors:
+                st.write(s)
+    return raw_rows
+
+
 def render():
     st.title("Herschel Marketplace Listing Tool")
-    st.caption("Shopee · Lazada · TikTok Shop · Zalora Indonesia")
+    st.caption("Shopee · Lazada · TikTok Shop · Zalora Indonesia · Shopify")
+
+    mode = st.radio(
+        "How do you want to provide your item data?",
+        [
+            "Fill in the simple raw data template",
+            "Import my own Masterfile + Images + Category files",
+        ],
+        key="herschel_mode",
+    )
+
+    if mode.startswith("Fill in"):
+        _render_simple_template_mode()
+    else:
+        _render_masterfile_import_mode()
+
+
+def _render_simple_template_mode():
     st.write(
         "Separate from the Hydro Flask tool — its own raw data format, its own "
         "category mapping rules. Upload one raw data file with all your items "
@@ -127,8 +232,8 @@ def render():
         st.write(
             "Zalora's **ColorFamily** and **SubCatType** are fully automatic — "
             "no field to fill in for either. ColorFamily is classified from "
-            "the first Zalora image's dominant color (falling back to a "
-            "keyword match on the Color name if no image is available), and "
+            "a keyword match on the Color name first, falling back to the "
+            "first Zalora image's dominant color if the name gives no clue. "
             "SubCatType is looked up from the PrimaryCategory your category "
             "mapping resolves to. **Weight** can be pasted straight from a "
             "spec sheet showing both units, e.g. `1.10 lb / 0.5` — the tool "
@@ -163,83 +268,104 @@ def render():
         st.warning("No data rows found. Make sure Seller SKUs are filled in.")
         return
 
-    if uploaded_map is not None:
-        try:
-            category_sheets, matched_sheets = load_herschel_category_mapping_workbook(uploaded_map)
-        except Exception as e:
-            st.error(f"Couldn't read the category mapping file: {e}")
-            return
-        total_entries = sum(len(v) for v in category_sheets.values())
-        st.success(
-            f"Loaded {total_entries} category mapping row(s) from sheet(s): "
-            + ", ".join(matched_sheets)
-        )
-        raw_rows = herschel_mapping.apply_exact_category_mapping(raw_rows, category_sheets)
-        unmatched = {p: [] for p in herschel_mapping.PLATFORM_CATEGORY_FIELD}
-        for r in raw_rows:
-            for p, f in herschel_mapping.PLATFORM_CATEGORY_FIELD.items():
-                if not r.get(f):
-                    unmatched[p].append(r.get("sku"))
-        for p, skus in unmatched.items():
-            if skus:
-                st.warning(
-                    f"No {PLATFORM_LABELS[p]} category match (Product Type + "
-                    f"Specific Category + Gender didn't exactly match any row in "
-                    f"the category mapping file) for: " + ", ".join(str(s) for s in skus)
-                )
-    else:
-        st.warning(
-            "No category mapping file uploaded — every Category ID field will "
-            "be blank in the output. Upload one to auto-fill them."
-        )
+    raw_rows = _apply_category_mapping_with_warnings(raw_rows, uploaded_map)
+
+    raw_rows = _resolve_colors_with_warning(raw_rows)
 
     st.success(f"Loaded {len(raw_rows)} SKU row(s) across "
                f"{len(herschel_mapping.group_rows_by_parent(raw_rows))} parent product(s).")
 
-    with st.spinner("Classifying Zalora color families from images..."):
-        raw_rows, unresolved_colors = herschel_mapping.resolve_color_families(raw_rows)
-    if unresolved_colors:
-        with st.expander(f"⚠️ Zalora ColorFamily couldn't be determined for {len(unresolved_colors)} SKU(s) — left blank"):
-            st.write(
-                "No Zalora image could be fetched/classified, and the Color "
-                "name didn't match any recognizable keyword either. Fill "
-                "these in by hand in the downloaded file if needed:"
-            )
-            for s in unresolved_colors:
-                st.write(s)
+    _render_preview_and_downloads(
+        raw_rows, ["shopee", "lazada", "tiktok", "zalora"],
+        "herschel_marketplace_listing_files.zip", key_prefix="simple",
+    )
 
-    st.subheader("Preview & download")
-    tabs = st.tabs([PLATFORM_LABELS[p] for p in ["shopee", "lazada", "tiktok", "zalora"]])
-    outputs = {}
 
-    for tab, platform in zip(tabs, ["shopee", "lazada", "tiktok", "zalora"]):
-        with tab:
-            headers, out_rows = herschel_mapping.build_platform_rows(platform, raw_rows)
-            df_out = pd.DataFrame(out_rows, columns=headers)
-            outputs[platform] = (headers, out_rows)
-            st.dataframe(df_out, use_container_width=True, height=350)
-            file_data = rows_to_xlsx_bytes(platform, headers, out_rows)
-            st.download_button(
-                f"Download {PLATFORM_LABELS[platform]} file",
-                data=file_data,
-                file_name=f"Herschel_{PLATFORM_LABELS[platform].replace(' ', '_')}_Listing_File.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key=f"dl_herschel_{platform}",
-            )
+def _render_masterfile_import_mode():
+    st.write(
+        "Upload your own internal Herschel Masterfile, a combined-images file "
+        "(the same format the **Image Link Combiner** tool produces — a "
+        "'Lazada Images' sheet and a 'Zalora Images' sheet, each with SKU + "
+        "Combined Images columns), and a category mapping file — no need to "
+        "manually re-type anything into the simple template. This mode also "
+        "produces a **5th file: Shopify**."
+    )
+    st.caption(
+        "Matched by column label, not position, so a reordered Masterfile "
+        "export still works as long as the column headers (row 3) are the "
+        "same. Images and category IDs are matched by Seller SKU / "
+        "Product Type+Specific Category+Gender, same as the simple template mode."
+    )
 
-    zip_buf = io.BytesIO()
-    with zipfile.ZipFile(zip_buf, "w") as zf:
-        for platform, (headers, out_rows) in outputs.items():
-            zf.writestr(
-                f"Herschel_{PLATFORM_LABELS[platform].replace(' ', '_')}_Listing_File.xlsx",
-                rows_to_xlsx_bytes(platform, headers, out_rows),
-            )
-    zip_buf.seek(0)
-    st.divider()
-    st.download_button(
-        "⬇️ Download all 4 files as ZIP",
-        data=zip_buf.read(),
-        file_name="herschel_marketplace_listing_files.zip",
-        mime="application/zip",
-        key="dl_herschel_zip",
+    with st.expander("⚠️ What this mode does NOT pull from your Masterfile", expanded=False):
+        st.write(
+            "- **Main Description 2** — the Masterfile's second description "
+            "column has no header label in row 3, so it can't be matched by "
+            "name; only Main Description* is captured. Add the rest "
+            "afterward if needed.\n"
+            "- **Item Specifications (Shopee/Lazada/TikTok)** beyond the "
+            "automatic Brand + Material defaults — the Masterfile's Fit/"
+            "Design/Occasion columns aren't pulled in yet.\n"
+            "- **Shopify Category ID** — left blank (no clear numeric source "
+            "in the Masterfile). **Shopify tags** comes straight from the "
+            "Masterfile's own 'Tags (*if for Shopify Listing)' column, and "
+            "**Shopify Product Type** comes from the Masterfile's own "
+            "Product Type column (BAGS/ACCESSORY) — these two do NOT mirror "
+            "each other like the Hydro Flask tool, since better source data "
+            "already exists here."
+        )
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        uploaded_master = st.file_uploader(
+            "Upload your Masterfile (.xlsx)", type=["xlsx"], key="herschel_master_upload"
+        )
+    with col2:
+        uploaded_images = st.file_uploader(
+            "Upload combined images file (.xlsx)", type=["xlsx"], key="herschel_master_images_upload"
+        )
+    with col3:
+        uploaded_map = st.file_uploader(
+            "Upload category mapping file (.xlsx)", type=["xlsx"], key="herschel_master_category_upload"
+        )
+
+    if uploaded_master is None:
+        st.info("Upload your Masterfile to get started (images and category files are optional, but recommended).")
+        return
+
+    try:
+        raw_rows = hmf.parse_masterfile(uploaded_master)
+    except Exception as e:
+        st.error(f"Couldn't read the Masterfile: {e}")
+        st.stop()
+
+    if not raw_rows:
+        st.warning("No data rows found. Make sure Inventory Sku is filled in.")
+        st.stop()
+
+    if uploaded_images is not None:
+        try:
+            lazada_images, zalora_images = hmf.load_images_workbook(uploaded_images)
+        except Exception as e:
+            st.error(f"Couldn't read the images file: {e}")
+            st.stop()
+        raw_rows, unmatched_imgs = hmf.merge_images_into_rows(raw_rows, lazada_images, zalora_images)
+        st.success(f"Matched images for {len(raw_rows) - len(unmatched_imgs)} / {len(raw_rows)} SKU(s).")
+        if unmatched_imgs:
+            with st.expander(f"⚠️ No images matched for {len(unmatched_imgs)} SKU(s)"):
+                for s in unmatched_imgs:
+                    st.write(s)
+    else:
+        st.warning("No images file uploaded — Product Image URL(s) will be blank in every output.")
+
+    raw_rows = _apply_category_mapping_with_warnings(raw_rows, uploaded_map)
+
+    raw_rows = _resolve_colors_with_warning(raw_rows)
+
+    st.success(f"Loaded {len(raw_rows)} SKU row(s) across "
+               f"{len(herschel_mapping.group_rows_by_parent(raw_rows))} parent product(s).")
+
+    _render_preview_and_downloads(
+        raw_rows, ["shopee", "lazada", "tiktok", "zalora", "shopify"],
+        "herschel_masterfile_listing_files.zip", key_prefix="master",
     )
