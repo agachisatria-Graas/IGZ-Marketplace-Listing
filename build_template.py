@@ -33,6 +33,8 @@ RAW_COLUMNS = [
     ("zalora_color_family", "Zalora Color Family", "", "grey"),
     ("zalora_color", "Zalora Color", "", "Harbor"),
     ("zalora_images", "Zalora Images", "Zalora's own image set, separated by ' ; '. Zalora requires different image dimensions/crops than the other 3 marketplaces, so give it its own set here rather than reusing Parent/Variant Images.", "https://example.com/zalora1.jpg ; https://example.com/zalora2.jpg"),
+    ("season", "Season", "For Zalora's Season column.", "Summer"),
+    ("year", "Year", "For Zalora's Year column.", 2026),
 ]
 
 # Category mapping template: one sheet per marketplace, each with

@@ -83,6 +83,12 @@ Hydro Flask specifics: Style Name is already a fully-formed Title (brand +
 style + size + color), so it's used as-is. Shopify's Category ID/tags/
 Product Type all come from the category mapping file's dedicated **Shopify
 Category** sheet (same keyword-in-title matching as the other 4 platforms).
+Zalora's **SubCatType** is resolved from an optional 4th column on the
+category mapping file's Zalora sheet (same keyword-matched row as the
+Category ID) — add that column there if you need SubCatType filled in.
+**Season** and **Year** are pulled straight from the Masterfile's own
+Season/Year columns. Zalora's **Color** is title-cased automatically, and
+**ProductGroup** is always left blank.
 
 Herschel specifics: Title comes from the Masterfile's Generic Item Name
 column (brand is prepended automatically if not already present). Shopify's
@@ -309,6 +315,9 @@ while you use it; close the terminal to stop it.
 - **Shopee Shipping Service**: pass this through exactly as you'd want it to
   appear in Shopee's "Shipping Service Details" column (e.g.
   `Reguler (Cashless):18000.00, Instant:18000.00`).
+- **Hydro Flask's TikTok output** has two always-fixed fields: "Pilih apakah
+  akan mendukung pembayaran di tempat." is always `N`, and "Asuransi
+  pengiriman" is always `Wajib`.
 - Everything is editable in `mapping.py` if a column mapping needs
   adjusting as your templates evolve — each marketplace has its own
   `build_<platform>_row()` function, and category-keyword matching lives in

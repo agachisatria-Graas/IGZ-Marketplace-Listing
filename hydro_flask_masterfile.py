@@ -33,6 +33,8 @@ MASTERFILE_LABEL_TO_KEY = {
     "Gender*": "zalora_gender",
     "Original SRP*": "price",
     "Shopee/Zalora /Shopify Description": "description_script_override",
+    "Season (*If for Zalora listing)": "season",
+    "Year (*If for Zalora listing)": "year",
 }
 
 
@@ -90,6 +92,8 @@ def parse_masterfile(uploaded_file):
             "zalora_color_family": str(r.get("zalora_color_family") or "").title(),
             "zalora_color": r.get("variant_value_1"),
             "zalora_images": "",  # filled in by merge_images_into_rows()
+            "season": r.get("season"),
+            "year": r.get("year"),
         }
         rows.append(row)
     return rows

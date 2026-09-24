@@ -282,14 +282,10 @@ PLATFORM_CATEGORY_FIELD = {
 }
 
 
-def match_keyword_category(title, gender, entries):
-    """entries: list of {'gender':.., 'keyword':.., 'id':..}. Returns the matched
-    category id, or None if no keyword from `entries` appears in `title`.
-
-    If multiple keywords match, the first one (in sheet row order) whose Gender
-    matches the item's gender wins; otherwise the first match with a blank/'Any'/
-    'Unisex' gender wins; otherwise the first match overall wins.
-    """
+def match_keyword_category_entry(title, gender, entries):
+    """Same matching logic as match_keyword_category, but returns the whole
+    matched entry dict (so callers can also read e.g. a Zalora-only
+    'subcat_type' field), not just the id."""
     title_l = str(title or "").lower()
     gender_l = str(gender or "").strip().lower()
     candidates = [e for e in entries if e.get("keyword") and str(e["keyword"]).lower() in title_l]
@@ -298,12 +294,24 @@ def match_keyword_category(title, gender, entries):
     if gender_l:
         for e in candidates:
             if str(e.get("gender") or "").strip().lower() == gender_l:
-                return e["id"]
+                return e
     for e in candidates:
         g = str(e.get("gender") or "").strip().lower()
         if not g or g in ("any", "unisex"):
-            return e["id"]
-    return candidates[0]["id"]
+            return e
+    return candidates[0]
+
+
+def match_keyword_category(title, gender, entries):
+    """entries: list of {'gender':.., 'keyword':.., 'id':..}. Returns the matched
+    category id, or None if no keyword from `entries` appears in `title`.
+
+    If multiple keywords match, the first one (in sheet row order) whose Gender
+    matches the item's gender wins; otherwise the first match with a blank/'Any'/
+    'Unisex' gender wins; otherwise the first match overall wins.
+    """
+    e = match_keyword_category_entry(title, gender, entries)
+    return e["id"] if e else None
 
 
 def apply_title_category_mapping(rows, category_sheets):
@@ -313,6 +321,8 @@ def apply_title_category_mapping(rows, category_sheets):
     for a keyword inside the item's Title (using zalora_gender as the item's
     gender for matching, since that's the schema's one gender field). A row's own
     manually-filled category field is kept as a fallback when nothing matches.
+    If the Zalora sheet's matched row also has a 'subcat_type' value, it's
+    captured into 'zalora_subcat_type_resolved'.
     Returns a new list of rows (does not mutate the input).
     """
     if not category_sheets:
@@ -323,9 +333,12 @@ def apply_title_category_mapping(rows, category_sheets):
         gender = r.get("zalora_gender")
         for platform, field in PLATFORM_CATEGORY_FIELD.items():
             entries = category_sheets.get(platform) or []
-            matched = match_keyword_category(r.get("title"), gender, entries)
-            if matched not in (None, ""):
-                r2[field] = matched
+            entry = match_keyword_category_entry(r.get("title"), gender, entries)
+            if entry:
+                if entry.get("id") not in (None, ""):
+                    r2[field] = entry["id"]
+                if platform == "zalora" and entry.get("subcat_type"):
+                    r2["zalora_subcat_type_resolved"] = entry["subcat_type"]
         out.append(r2)
     return out
 
@@ -509,6 +522,8 @@ def build_tiktok_row(row, group):
         "Kuantitas": 0,
         "SKU Penjual": row.get("sku"),
         "Bahan": default_material(row.get("title")),
+        "Pilih apakah akan mendukung pembayaran di tempat.": "N",
+        "Asuransi pengiriman": "Wajib",
     }
     # A manually-typed spec whose key matches one of the named attribute
     # columns above (case-insensitive) lands directly in that column —
@@ -559,15 +574,17 @@ def build_zalora_row(row, group):
         "Brand": row.get("brand"),
         "PrimaryCategory": row.get("zalora_category"),
         "Gender": row.get("zalora_gender"),
-        "SubCatType": "Sports Metal Water Bottles",
+        "SubCatType": row.get("zalora_subcat_type_resolved", ""),
         "Name": ensure_brand_prefix(row.get("title"), row.get("brand")),
         "ColorFamily": row.get("zalora_color_family_resolved", ""),
         "Sizesystembrand": "International",
-        "Color": row.get("zalora_color"),
+        "Color": str(row.get("zalora_color") or "").title(),
         "Variation": "One Size",
         "Quantity": 0,
         "Price": to_number(row.get("price")),
         "Description": script_description(row),
+        "Year": row.get("year"),
+        "Season": row.get("season"),
         "Material": material,
         "BoxHeightSimple": to_number(row.get("height_cm")),
         "BoxLengthSimple": to_number(row.get("length_cm")),
@@ -577,7 +594,7 @@ def build_zalora_row(row, group):
         "Image2": image_slots[1], "Image3": image_slots[2], "Image4": image_slots[3],
         "Image5": image_slots[4], "Image6": image_slots[5], "Image7": image_slots[6],
         "Image8": image_slots[7],
-        "ProductGroup": row.get("parent_id"),
+        "ProductGroup": "",
     }
     return [out.get(h, "") for h in ZALORA_HEADERS]
 

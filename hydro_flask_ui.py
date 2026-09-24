@@ -17,6 +17,7 @@ RAW_COLUMNS = [
     "shopee_item_specifications", "lazada_item_specifications",
     "tiktok_item_specifications", "zalora_gender",
     "zalora_subcat_type", "zalora_color_family", "zalora_color", "zalora_images",
+    "season", "year",
 ]
 
 RAW_LABEL_TO_KEY = {
@@ -37,6 +38,7 @@ RAW_LABEL_TO_KEY = {
     "Zalora Gender": "zalora_gender", "Zalora Sub Cat Type": "zalora_subcat_type",
     "Zalora Color Family": "zalora_color_family", "Zalora Color": "zalora_color",
     "Zalora Images": "zalora_images",
+    "Season": "season", "Year": "year",
 }
 
 
@@ -58,6 +60,8 @@ def load_raw_file(uploaded_file):
 def load_category_mapping_workbook(uploaded_file):
     """Reads a category mapping workbook: one sheet per marketplace, each with
     (Gender, Keyword in Title, Category ID) columns — matched positionally.
+    The Zalora sheet may have an optional 4th column, SubCatType, captured
+    as 'subcat_type' on each entry.
     Returns {'shopee': [{'gender':..,'keyword':..,'id':..}, ...], 'lazada': [...], ...}
     """
     sheets = pd.read_excel(uploaded_file, sheet_name=None, header=0)
@@ -75,12 +79,14 @@ def load_category_mapping_workbook(uploaded_file):
         df = df.dropna(how="all")
         for _, row in df.iterrows():
             gender, keyword, cat_id = row.iloc[0], row.iloc[1], row.iloc[2]
+            subcat_type = row.iloc[3] if df.shape[1] >= 4 else None
             if pd.isna(keyword) or str(keyword).strip() == "":
                 continue
             out[platform].append({
                 "gender": "" if pd.isna(gender) else gender,
                 "keyword": str(keyword).strip(),
                 "id": "" if pd.isna(cat_id) else cat_id,
+                "subcat_type": "" if pd.isna(subcat_type) else subcat_type,
             })
     return out, matched_sheets
 
