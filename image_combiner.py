@@ -10,6 +10,7 @@ import re
 from collections import defaultdict
 
 FILENAME_RE = re.compile(r"^(?P<sku>.+?)_(?P<idx>\d+)\.(?P<ext>[a-zA-Z0-9]+)$")
+PLAIN_FILENAME_RE = re.compile(r"^(?P<sku>.+?)\.(?P<ext>[a-zA-Z0-9]+)$")
 
 
 def extract_sku_and_index(url):
@@ -82,3 +83,60 @@ def group_and_combine_from_pairs(filename_url_pairs, sep=" ; "):
         sorted_urls = [u for _, u in sorted(groups[sku], key=lambda t: t[0])]
         combined[sku] = sep.join(sorted_urls)
     return combined, unmatched
+
+
+def extract_sku_plain(filename):
+    """'2100329447.jpg' -> '2100329447' (no _N suffix). None if no match."""
+    fname = str(filename).strip().split("/")[-1].split("?")[0].split("#")[0]
+    m = PLAIN_FILENAME_RE.match(fname)
+    return m.group("sku") if m else None
+
+
+def group_lists_from_pairs(filename_url_pairs):
+    """Like group_and_combine_from_pairs but returns ({sku: [urls sorted by _N]}, unmatched)."""
+    groups = defaultdict(list)
+    order = []
+    unmatched = []
+    for filename, url in filename_url_pairs:
+        fname = str(filename).strip()
+        u = str(url).strip()
+        if not fname and not u:
+            continue
+        sku, idx = extract_sku_and_index(fname)
+        if sku is None:
+            unmatched.append(fname or u)
+            continue
+        if sku not in groups:
+            order.append(sku)
+        groups[sku].append((idx, u))
+    return {sku: [u for _, u in sorted(groups[sku], key=lambda t: t[0])] for sku in order}, unmatched
+
+
+def load_shopify_hero_images_from_pairs(filename_url_pairs):
+    """Shopify first-image file: bare-SKU filenames. Returns ({sku: url}, unmatched). Last wins."""
+    heroes = {}
+    unmatched = []
+    for filename, url in filename_url_pairs:
+        fname = str(filename).strip()
+        u = str(url).strip()
+        if not fname and not u:
+            continue
+        sku = extract_sku_plain(fname)
+        if sku is None or not u:
+            unmatched.append(fname or u)
+            continue
+        heroes[sku] = u
+    return heroes, unmatched
+
+
+def build_shopify_combination(hero_images, lazada_shopee_grouped, sep=" ; "):
+    """Hero image first, then Lazada/Shopee images minus the first (_1) one.
+    No hero -> full Lazada list; hero without Lazada -> hero alone."""
+    result = {}
+    skus = list(lazada_shopee_grouped.keys()) + [s for s in hero_images if s not in lazada_shopee_grouped]
+    for sku in skus:
+        lz = lazada_shopee_grouped.get(sku, [])
+        hero = hero_images.get(sku)
+        urls = ([hero] + lz[1:]) if hero else list(lz)
+        result[sku] = sep.join(urls)
+    return result

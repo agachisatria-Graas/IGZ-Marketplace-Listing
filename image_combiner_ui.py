@@ -30,18 +30,30 @@ def render():
             "Zalora needs images at a different dimension (**762 × 1100**) than "
             "Lazada/Shopee, so it needs its own separate source file. Upload "
             "both below — each is combined independently, and the result comes "
-            "back as one Excel file with a **Lazada Images** tab and a "
-            "**Zalora Images** tab."
+            "back as one Excel file with **Lazada Images**, **Zalora Images** and (if you add the Shopify first-image file) **Shopify Images** tabs."
         )
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         with col1:
             st.subheader("Lazada / Shopee Images")
-            lazada_combined, lazada_unmatched = _media_file_uploader("lazada")
+            lazada_pairs = _pairs_uploader("lazada")
         with col2:
             st.subheader("Zalora Images (762 × 1100)")
             zalora_combined, zalora_unmatched = _media_file_uploader("zalora")
+        with col3:
+            st.subheader("Shopify first image (optional)")
+            st.caption("Filenames are the bare SKU, e.g. `2100329447.jpg` (no `_1`).")
+            shopify_pairs = _pairs_uploader("shopify")
 
-        if lazada_combined or zalora_combined:
+        lazada_combined, lazada_unmatched, lazada_lists = None, None, {}
+        if lazada_pairs is not None:
+            lazada_lists, lazada_unmatched = image_combiner.group_lists_from_pairs(lazada_pairs)
+            lazada_combined = {k: " ; ".join(v) for k, v in lazada_lists.items()}
+        shopify_combined, shopify_unmatched = None, []
+        if shopify_pairs is not None:
+            heroes, shopify_unmatched = image_combiner.load_shopify_hero_images_from_pairs(shopify_pairs)
+            shopify_combined = image_combiner.build_shopify_combination(heroes, lazada_lists)
+
+        if lazada_combined or zalora_combined or shopify_combined:
             st.divider()
             st.subheader("Combined output")
             buf = io.BytesIO()
@@ -49,18 +61,25 @@ def render():
             wb.remove(wb.active)
             _write_combined_sheet(wb, "Lazada Images", lazada_combined or {})
             _write_combined_sheet(wb, "Zalora Images", zalora_combined or {})
+            if shopify_combined is not None:
+                _write_combined_sheet(wb, "Shopify Images", shopify_combined)
             wb.save(buf)
             buf.seek(0)
             st.success(
                 f"Lazada: {len(lazada_combined or {})} SKU(s) combined. "
-                f"Zalora: {len(zalora_combined or {})} SKU(s) combined."
+                f"Zalora: {len(zalora_combined or {})} SKU(s) combined. "
+                f"Shopify: {len(shopify_combined or {})} SKU(s) combined."
             )
             st.download_button(
-                "Download lazada_zalora_images.xlsx",
+                "Download lazada_zalora_shopify_images.xlsx" if shopify_combined is not None else "Download lazada_zalora_images.xlsx",
                 data=buf.read(),
-                file_name="lazada_zalora_images.xlsx",
+                file_name="lazada_zalora_shopify_images.xlsx" if shopify_combined is not None else "lazada_zalora_images.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
+            if shopify_unmatched:
+                with st.expander(f"⚠️ Shopify: {len(shopify_unmatched)} File Name(s) didn't match SKU.ext"):
+                    for u in shopify_unmatched:
+                        st.write(u)
             if lazada_unmatched:
                 with st.expander(f"⚠️ Lazada: {len(lazada_unmatched)} File Name(s) didn't match SKU_N.ext"):
                     for u in lazada_unmatched:
@@ -141,6 +160,31 @@ def _media_file_uploader(key_prefix):
 
     pairs = list(zip(df_media[filename_col], df_media[url_col]))
     return image_combiner.group_and_combine_from_pairs(pairs)
+
+
+def _pairs_uploader(key_prefix):
+    """Uploader returning raw (filename, url) pairs, or None."""
+    f = st.file_uploader("Upload file (.xlsx or .csv)", type=["xlsx", "csv"], key=f"upload_{key_prefix}")
+    if f is None:
+        return None
+    try:
+        df = pd.read_csv(f) if f.name.lower().endswith(".csv") else pd.read_excel(f)
+    except Exception as e:
+        st.error(f"Couldn't read that file: {e}")
+        return None
+    cols = list(df.columns)
+
+    def guess(keywords, exclude=()):
+        for c in cols:
+            cl = str(c).lower()
+            if any(k in cl for k in keywords) and not any(x in cl for x in exclude):
+                return c
+        return cols[0]
+
+    fc = st.selectbox("File Name column", cols, index=cols.index(guess(["file", "name"], ["date"])), key=f"fname_{key_prefix}")
+    uc = st.selectbox("Image URL column", cols, index=cols.index(guess(["image", "url", "link"])), key=f"url_{key_prefix}")
+    st.dataframe(df[[fc, uc]].head(5), use_container_width=True)
+    return list(zip(df[fc], df[uc]))
 
 
 def _write_combined_sheet(wb, sheet_title, combined):
