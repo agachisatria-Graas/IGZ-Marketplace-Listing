@@ -125,12 +125,20 @@ def _render_preview_and_downloads(raw_rows, platforms, zip_filename, key_prefix=
     )
 
 
-def _apply_category_mapping_with_warnings(raw_rows, uploaded_map):
+def _apply_category_mapping_with_warnings(raw_rows, uploaded_map, masterfile_mode=False):
     if uploaded_map is None:
-        st.warning(
-            "No category mapping file uploaded — every Category ID field will "
-            "be blank in the output. Upload one to auto-fill them."
-        )
+        if masterfile_mode:
+            raw_rows, _ = hmf.apply_category_fallbacks(raw_rows, {})
+            st.warning(
+                "No category mapping file uploaded — using only the category "
+                "columns already in your Masterfile (Shopee/Lazada/Zalora); "
+                "TikTok category will be blank."
+            )
+        else:
+            st.warning(
+                "No category mapping file uploaded — every Category ID field will "
+                "be blank in the output. Upload one to auto-fill them."
+            )
         return raw_rows
 
     try:
@@ -144,6 +152,15 @@ def _apply_category_mapping_with_warnings(raw_rows, uploaded_map):
         + ", ".join(matched_sheets)
     )
     raw_rows = herschel_mapping.apply_exact_category_mapping(raw_rows, category_sheets)
+    if masterfile_mode:
+        raw_rows, fb = hmf.apply_category_fallbacks(raw_rows, category_sheets)
+        for p, skus in fb.items():
+            if skus:
+                st.info(
+                    f"{PLATFORM_LABELS[p]}: {len(skus)} SKU(s) had no exact match in the "
+                    "category mapping file, so the category came from your Masterfile's own "
+                    "category column" + (" / a plural-insensitive match" if p == "tiktok" else "") + "."
+                )
     unmatched = {p: [] for p in herschel_mapping.PLATFORM_CATEGORY_FIELD}
     for r in raw_rows:
         for p, f in herschel_mapping.PLATFORM_CATEGORY_FIELD.items():
@@ -299,10 +316,8 @@ def _render_masterfile_import_mode():
 
     with st.expander("⚠️ What this mode does NOT pull from your Masterfile", expanded=False):
         st.write(
-            "- **Main Description 2** — the Masterfile's second description "
-            "column has no header label in row 3, so it can't be matched by "
-            "name; only Main Description* is captured. Add the rest "
-            "afterward if needed.\n"
+            "- **Descriptions** — in the newer Masterfile layout, Description "
+            "1 / 2 / 3 are all captured (joined with line breaks).\n"
             "- **Item Specifications (Shopee/Lazada/TikTok)** beyond the "
             "automatic Brand + Material defaults — the Masterfile's Fit/"
             "Design/Occasion columns aren't pulled in yet.\n"
@@ -345,11 +360,11 @@ def _render_masterfile_import_mode():
 
     if uploaded_images is not None:
         try:
-            lazada_images, zalora_images = hmf.load_images_workbook(uploaded_images)
+            lazada_images, zalora_images, shopify_images = hmf.load_images_workbook(uploaded_images)
         except Exception as e:
             st.error(f"Couldn't read the images file: {e}")
             st.stop()
-        raw_rows, unmatched_imgs = hmf.merge_images_into_rows(raw_rows, lazada_images, zalora_images)
+        raw_rows, unmatched_imgs = hmf.merge_images_into_rows(raw_rows, lazada_images, zalora_images, shopify_images)
         st.success(f"Matched images for {len(raw_rows) - len(unmatched_imgs)} / {len(raw_rows)} SKU(s).")
         if unmatched_imgs:
             with st.expander(f"⚠️ No images matched for {len(unmatched_imgs)} SKU(s)"):
@@ -358,7 +373,7 @@ def _render_masterfile_import_mode():
     else:
         st.warning("No images file uploaded — Product Image URL(s) will be blank in every output.")
 
-    raw_rows = _apply_category_mapping_with_warnings(raw_rows, uploaded_map)
+    raw_rows = _apply_category_mapping_with_warnings(raw_rows, uploaded_map, masterfile_mode=True)
 
     raw_rows = _resolve_colors_with_warning(raw_rows)
 

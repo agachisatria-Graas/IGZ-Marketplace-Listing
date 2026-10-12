@@ -552,7 +552,8 @@ def build_shopify_row(row, group):
     var1 = f"{axes[0][0]}:{axes[0][1]}" if len(axes) >= 1 and total_variation else ""
     var2 = f"{axes[1][0]}:{axes[1][1]}" if len(axes) >= 2 and total_variation else ""
 
-    imgs = merged_images(row)
+    shopify_imgs = [u.strip() for u in str(row.get("shopify_images") or "").split(";") if u.strip()]
+    imgs = shopify_imgs or merged_images(row)
 
     out = {
         "Seller SKU": row.get("sku"),
