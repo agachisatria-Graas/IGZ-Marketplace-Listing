@@ -241,7 +241,7 @@ def build_shopify_row(row, group):
     tags = row.get("shopify_tags") or ""
     out = {
         "Seller SKU": row.get("sku"),
-        "Product Name": ensure_brand_prefix(row.get("title"), row.get("brand")),
+        "Product Name": str(row.get("title") or "").strip(),
         "Product Description 1": script_description(row),
         "Total variation": total or "", "Variation 1": v1, "Variation 2": v2,
         "RRP": to_number(row.get("price")), "Currency Code": "IDR", "Quantity": 0,
