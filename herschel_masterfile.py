@@ -13,6 +13,7 @@ import pandas as pd
 MASTERFILE_LABEL_TO_KEY = {
     "Generic Item Name": "title",
     "Inventory Sku*": "sku",
+    "Seller SKU": "sku",  # newer Masterfile exports use this label for the same column
     "Parent Sku": "parent_id",
     "Specific Category": "specific_category",
     "Product Type": "product_type",
@@ -53,7 +54,7 @@ def parse_masterfile(uploaded_file):
     preview = pd.read_excel(uploaded_file, sheet_name=0, header=None, nrows=10)
     header_row = 2
     for i in range(len(preview)):
-        if any(str(v).strip() == "Inventory Sku*" for v in preview.iloc[i].tolist()):
+        if any(str(v).strip() in ("Inventory Sku*", "Seller SKU") for v in preview.iloc[i].tolist()):
             header_row = i
             break
     if hasattr(uploaded_file, "seek"):
