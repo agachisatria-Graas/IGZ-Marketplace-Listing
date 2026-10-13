@@ -557,7 +557,7 @@ def build_shopify_row(row, group):
 
     out = {
         "Seller SKU": row.get("sku"),
-        "Product Name": ensure_brand_prefix(row.get("title"), row.get("brand")),
+        "Product Name": str(row.get("title") or "").strip(),  # Shopify: no brand prefix
         "Product Description 1": combined_description(row),
         "Total variation": total_variation or "",
         "Variation 1": var1,
