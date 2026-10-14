@@ -113,7 +113,10 @@ def group_lists_from_pairs(filename_url_pairs):
 
 
 def load_shopify_hero_images_from_pairs(filename_url_pairs):
-    """Shopify first-image file: bare-SKU filenames. Returns ({sku: url}, unmatched). Last wins."""
+    """Shopify first-image file. Filenames are SKU_N.ext like Lazada/Shopee;
+    only the _1 image of each SKU is used (it becomes the first image of the
+    Shopify combination). Bare-SKU filenames (no _N) are still accepted as
+    the first image. Returns ({sku: url}, unmatched). Last duplicate wins."""
     heroes = {}
     unmatched = []
     for filename, url in filename_url_pairs:
@@ -121,6 +124,11 @@ def load_shopify_hero_images_from_pairs(filename_url_pairs):
         u = str(url).strip()
         if not fname and not u:
             continue
+        sku, idx = extract_sku_and_index(fname)
+        if sku is not None:
+            if idx == 1 and u:
+                heroes[sku] = u
+            continue  # _2, _3... in the Shopify file are not used
         sku = extract_sku_plain(fname)
         if sku is None or not u:
             unmatched.append(fname or u)

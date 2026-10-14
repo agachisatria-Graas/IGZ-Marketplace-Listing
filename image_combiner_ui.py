@@ -41,7 +41,7 @@ def render():
             zalora_combined, zalora_unmatched = _media_file_uploader("zalora")
         with col3:
             st.subheader("Shopify first image (optional)")
-            st.caption("Filenames are the bare SKU, e.g. `2100329447.jpg` (no `_1`).")
+            st.caption("Same `SKU_N.jpg` naming as Lazada/Shopee — only each SKU's `_1` is used, as the first Shopify image.")
             shopify_pairs = _pairs_uploader("shopify")
 
         lazada_combined, lazada_unmatched, lazada_lists = None, None, {}
