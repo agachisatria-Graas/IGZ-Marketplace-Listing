@@ -103,7 +103,15 @@ def hedgren_axes(row, group):
     return axes
 
 
-def _variation_fields(row, group):
+def is_single_listing(row):
+    """Listing Type column = 'No Variation' -> a standalone single-SKU listing."""
+    return _norm(row.get("listing_type")) == "NO VARIATION"
+
+
+def _variation_fields(row, group, single_aware=False):
+    """single_aware=True (Shopee/Lazada/Shopify): 'No Variation' rows get no variation fields."""
+    if single_aware and is_single_listing(row):
+        return [], 0, "", ""
     axes = hedgren_axes(row, group)
     total = len(axes) if len(group) > 1 else 0
     v1 = f"{axes[0][0]}:{axes[0][1]}" if total >= 1 else ""
@@ -129,7 +137,7 @@ def lazada_default_specs(row):
 # ---------------------------------------------------------------------------
 
 def build_shopee_row(row, group):
-    axes, total, v1, v2 = _variation_fields(row, group)
+    axes, total, v1, v2 = _variation_fields(row, group, single_aware=True)
     specs = shopee_default_specs(row) + parse_specs(row.get("shopee_item_specifications"))
     out = {
         "Seller SKU": row.get("sku"),
@@ -151,7 +159,7 @@ def build_shopee_row(row, group):
 
 
 def build_lazada_row(row, group):
-    axes, total, v1, v2 = _variation_fields(row, group)
+    axes, total, v1, v2 = _variation_fields(row, group, single_aware=True)
     specs = lazada_default_specs(row) + parse_specs(row.get("lazada_item_specifications"))
     title = ensure_brand_prefix(row.get("title"), row.get("brand"))
     desc = script_description(row) + parent_image_html_snippet(row)
@@ -179,6 +187,7 @@ def build_tiktok_row(row, group):
     axes, total, v1, v2 = _variation_fields(row, group)
     slots = (split_images(row.get("parent_images")) + [""] * 9)[:9]
     variant_imgs = split_images(row.get("variant_images"))
+    single = False  # single-listing rule applies to Shopee/Lazada/Shopify
     out = {
         "Kategori": row.get("tiktok_category"), "Merek": row.get("brand"),
         "Nama produk": ensure_brand_prefix(row.get("title"), row.get("brand")),
@@ -186,9 +195,9 @@ def build_tiktok_row(row, group):
         "Gambar utama": slots[0], "Gambar 2": slots[1], "Gambar 3": slots[2], "Gambar 4": slots[3],
         "Gambar 5": slots[4], "Gambar 6": slots[5], "Gambar 7": slots[6],
         "Gambar Produk 8": slots[7], "Gambar Produk 9": slots[8],
-        "Nama varian utama (tema)": "Color" if row.get("variant_value_1") else "",
-        "Nilai varian utama (opsi)": str(row.get("variant_value_1") or "").title(),
-        "Gambar varian utama 1": variant_imgs[0] if variant_imgs else "",
+        "Nama varian utama (tema)": "" if single else ("Color" if row.get("variant_value_1") else ""),
+        "Nilai varian utama (opsi)": "" if single else str(row.get("variant_value_1") or "").title(),
+        "Gambar varian utama 1": "" if single else (variant_imgs[0] if variant_imgs else ""),
         "Nama varian sekunder (tema)": "", "Nilai varian sekunder (opsi)": "",
         "Berat paket(g)": to_number(row.get("weight_kg")) * 1000,
         "Panjang paket(cm)": to_number(row.get("length_cm")),
@@ -209,8 +218,9 @@ def build_tiktok_row(row, group):
 
 def build_zalora_row(row, group):
     slots = (zalora_image_list(row) + [""] * 8)[:8]
+    own_parent = row.get("parent_id")
     out = {
-        "SkuSupplierConfig": row.get("parent_id"), "ParentSku": row.get("parent_id"),
+        "SkuSupplierConfig": own_parent, "ParentSku": own_parent,
         "SellerSku": row.get("sku"), "Brand": row.get("brand"),
         "PrimaryCategory": row.get("zalora_category"),
         "Gender": GENDER_TO_ZALORA.get(_norm(row.get("gender")), str(row.get("gender") or "").title()),
@@ -235,7 +245,7 @@ def build_zalora_row(row, group):
 
 
 def build_shopify_row(row, group):
-    axes, total, v1, v2 = _variation_fields(row, group)
+    axes, total, v1, v2 = _variation_fields(row, group, single_aware=True)
     shopify_imgs = split_images(row.get("shopify_images"))
     imgs = shopify_imgs or merged_images(row)
     tags = row.get("shopify_tags") or ""

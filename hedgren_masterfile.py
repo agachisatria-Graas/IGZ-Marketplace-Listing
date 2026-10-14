@@ -13,6 +13,7 @@ MASTERFILE_LABEL_TO_KEY = {
     "Seller SKU": "sku",  # newer Masterfile exports use this label for the same column
     "Parent Sku": "parent_id",
     "Product Type": "product_type",
+    "Listing Type": "listing_type",
     "Long Description (*If for Lazada & Dotcom listing)": "main_description",
     "Size*": "variant_value_2",
     "Package Length (cm)*": "length_cm",
@@ -66,6 +67,7 @@ def parse_masterfile(uploaded_file):
             "length_cm": _hfm._parse_decimal(r.get("length_cm")),
             "width_cm": _hfm._parse_decimal(r.get("width_cm")),
             "height_cm": _hfm._parse_decimal(r.get("height_cm")),
+            "listing_type": r.get("listing_type", ""),
             "product_type": r.get("product_type"), "gender": r.get("gender"),
             "material": r.get("material"), "care_label": r.get("care_label"),
             "shopee_item_specifications": "", "lazada_item_specifications": "",
