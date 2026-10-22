@@ -19,7 +19,7 @@ import re
 from mapping import (
     IMG_SEP, split_images, merged_images, zalora_image_list, parse_specs,
     group_rows_by_parent, to_number, parent_image_html_snippet, ensure_brand_prefix,
-    script_description, short_description_html, combined_description,
+    script_description, short_description_html, lazada_short_description, combined_description,
     resolve_color_families, SHOPEE_HEADERS, LAZADA_HEADERS, TIKTOK_HEADERS,
     TIKTOK_NAMED_ATTRIBUTE_COLUMNS, ZALORA_HEADERS, SHOPIFY_HEADERS,
 )
@@ -167,7 +167,7 @@ def build_lazada_row(row, group):
         "Seller SKU": row.get("sku"), "Product Name": title, "Product Name (English)": title,
         "Product Description 1": desc, "Product Description(English) 1": desc,
         "Total variation": total or "", "Variation 1": v1, "Variation 2": v2,
-        "Short Description": short_description_html(row),
+        "Short Description": lazada_short_description(row),
         "SRP": "", "RRP": to_number(row.get("price")), "Currency Code": "IDR", "Quantity": 0,
         "Product Image URL(s)": IMG_SEP.join(merged_images(row)),
         "Category ID": row.get("lazada_category_id"),

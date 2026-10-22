@@ -236,6 +236,18 @@ def short_description_html(row):
     return ""
 
 
+def lazada_short_description(row):
+    """Lazada Short Description: always starts with a '<li>Brand: X</li>'
+    bullet (brand from the row), followed by any other bullets that
+    short_description_html() would have produced."""
+    brand = str(row.get("brand") or "").strip()
+    inner = short_description_html(row)
+    inner = re.sub(r"^\s*<ul>|</ul>\s*$", "", inner)
+    if brand and "<li>Brand:" not in inner:
+        inner = f"<li>Brand: {html.escape(brand)}</li>" + inner
+    return f"<ul>{inner}</ul>" if inner else ""
+
+
 def zalora_image_list(row):
     """Zalora uses its own dedicated image set (different crop/dimensions than
     the other marketplaces) — sourced only from the 'Zalora Images' column,
@@ -448,7 +460,7 @@ def build_lazada_row(row, group):
         "Total variation": total_variation or "",
         "Variation 1": var1,
         "Variation 2": var2,
-        "Short Description": short_description_html(row),
+        "Short Description": lazada_short_description(row),
         "SRP": "",
         "RRP": to_number(row.get("price")),
         "Currency Code": "IDR",

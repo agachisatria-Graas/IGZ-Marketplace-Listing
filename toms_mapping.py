@@ -38,6 +38,7 @@ from mapping import (
     split_images, merged_images, zalora_image_list, text_to_html,
     lines_to_bullets_html, parse_specs, variant_label, group_rows_by_parent,
     to_number, parent_image_html_snippet, ensure_brand_prefix,
+    lazada_short_description,
 )
 
 IMG_SEP = " ; "
@@ -453,7 +454,7 @@ def _lazada_common_fields(row):
     out = {
         "Product Name": title,
         "Product Name (English)": title,
-        "Short Description": short_description_html(row),
+        "Short Description": lazada_short_description(row),
         "SRP": "",
         "RRP": to_number(row.get("price")),
         "Currency Code": "IDR",
