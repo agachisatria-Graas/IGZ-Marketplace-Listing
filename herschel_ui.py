@@ -127,18 +127,10 @@ def _render_preview_and_downloads(raw_rows, platforms, zip_filename, key_prefix=
 
 def _apply_category_mapping_with_warnings(raw_rows, uploaded_map, masterfile_mode=False):
     if uploaded_map is None:
-        if masterfile_mode:
-            raw_rows, _ = hmf.apply_category_fallbacks(raw_rows, {})
-            st.warning(
-                "No category mapping file uploaded — using only the category "
-                "columns already in your Masterfile (Shopee/Lazada/Zalora); "
-                "TikTok category will be blank."
-            )
-        else:
-            st.warning(
-                "No category mapping file uploaded — every Category ID field will "
-                "be blank in the output. Upload one to auto-fill them."
-            )
+        st.warning(
+            "No category mapping file uploaded — every Category ID field will "
+            "be blank in the output. Upload one to auto-fill them."
+        )
         return raw_rows
 
     try:
@@ -152,15 +144,6 @@ def _apply_category_mapping_with_warnings(raw_rows, uploaded_map, masterfile_mod
         + ", ".join(matched_sheets)
     )
     raw_rows = herschel_mapping.apply_exact_category_mapping(raw_rows, category_sheets)
-    if masterfile_mode:
-        raw_rows, fb = hmf.apply_category_fallbacks(raw_rows, category_sheets)
-        for p, skus in fb.items():
-            if skus:
-                st.info(
-                    f"{PLATFORM_LABELS[p]}: {len(skus)} SKU(s) had no exact match in the "
-                    "category mapping file, so the category came from your Masterfile's own "
-                    "category column" + (" / a plural-insensitive match" if p == "tiktok" else "") + "."
-                )
     unmatched = {p: [] for p in herschel_mapping.PLATFORM_CATEGORY_FIELD}
     for r in raw_rows:
         for p, f in herschel_mapping.PLATFORM_CATEGORY_FIELD.items():
