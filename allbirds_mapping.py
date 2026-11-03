@@ -22,7 +22,7 @@ import re
 from mapping import (
     IMG_SEP, split_images, merged_images, zalora_image_list, parse_specs,
     group_rows_by_parent, to_number, parent_image_html_snippet, ensure_brand_prefix,
-    text_to_html, lazada_short_description, SHOPIFY_HEADERS,
+    text_to_html, lazada_short_description,
 )
 from toms_mapping import (
     SHOPEE_HEADERS, LAZADA_HEADERS, TIKTOK_HEADERS, TIKTOK_NAMED_ATTRIBUTE_COLUMNS,
@@ -88,6 +88,10 @@ def apply_category_mapping(rows, category_sheets):
                 r2[field] = e["id"]
             if e.get("sizechart"):
                 r2[PLATFORM_SIZECHART_FIELD[platform]] = e["sizechart"]
+            if platform == "shopee" and e.get("words"):
+                # Shopify Product Type & tags = the matched keyword (e.g. "Sneakers"), like Toms
+                r2["shopify_product_type"] = e["words"]
+                r2["shopify_tags"] = e["words"]
         out.append(r2)
     return out
 
@@ -295,36 +299,73 @@ def build_zalora_row(row):
     return [out.get(h, "") for h in ZALORA_HEADERS]
 
 
-def build_shopify_row(row, group):
-    single = is_single_listing(row) or len(group) <= 1
-    axes = [] if single else _axes(row)
-    imgs = split_images(row.get("shopify_images")) or merged_images(row)
-    out = {
-        "Seller SKU": row.get("sku"),
-        "Product Name": str(row.get("title") or "").strip(),  # Shopify: no brand prefix added
+SHOPIFY_HEADERS_TOMS = [
+    "Seller SKU", "Product Name", "Product Description 1", "Product Description 2",
+    "Product Description 3", "Total variation", "Variation 1", "Variation 2", "Variation 3",
+    "RRP", "compare At Price", "Currency Code", "Quantity", "Category ID",
+    "Product Image URL(s)", "Weight (Kg)", "Vendor", "Product Type", "Taxable", "tags",
+]
+
+
+def _shopify_size(v):
+    """'US 6' -> 'US:6' (Toms Shopify format)."""
+    return re.sub(r"^([A-Za-z]+)\s+", r"\1:", str(v or "").strip())
+
+
+def _shopify_common(row):
+    return {
+        "Product Name": str(row.get("title") or "").strip(),  # no brand prefix added
         "Product Description 1": script_description(row),
-        "Total variation": len(axes) or "",
-        "Variation 1": f"{axes[0][0]}:{axes[0][1]}" if len(axes) >= 1 else "",
-        "Variation 2": f"{axes[1][0]}:{axes[1][1]}" if len(axes) >= 2 else "",
         "RRP": to_number(row.get("price")), "Currency Code": "IDR", "Quantity": 0,
         "Category ID": row.get("shopify_category_id"),
-        "Product Image URL(s)": IMG_SEP.join(imgs),
         "Weight (Kg)": to_number(row.get("weight_kg")),
-        "Vendor": row.get("brand"),
         "Product Type": row.get("shopify_product_type", ""),
         "tags": row.get("shopify_tags", ""),
     }
-    return [out.get(h, "") for h in SHOPIFY_HEADERS]
+
+
+def _shopify_images(row, parent_only=False):
+    own = split_images(row.get("shopify_images"))
+    if own:
+        return own
+    return split_images(row.get("parent_images")) if parent_only else merged_images(row)
+
+
+def build_shopify_group_rows(group):
+    """Same layout as Toms' Shopify file: one header row per Parent SKU
+    (blank SKU, Total variation = number of variant SKUs, Variation 1/2 =
+    axis names), then one row per variant SKU with the colour value and the
+    size as 'US:6'. Single-SKU listings are one flat row."""
+    if len(group) == 1 or is_single_listing(group[0]):
+        row = group[0]
+        out = _shopify_common(row)
+        out.update({"Seller SKU": row.get("sku"), "Product Image URL(s)": IMG_SEP.join(_shopify_images(row))})
+        return [[out.get(h, "") for h in SHOPIFY_HEADERS_TOMS]]
+    rep = group[0]
+    header = _shopify_common(rep)
+    header.update({"Seller SKU": "", "Total variation": len(group),
+                   "Variation 1": rep.get("variant_name_1") or "", "Variation 2": rep.get("variant_name_2") or "",
+                   "Product Image URL(s)": IMG_SEP.join(_shopify_images(rep, parent_only=True))})
+    rows_out = [[header.get(h, "") for h in SHOPIFY_HEADERS_TOMS]]
+    for row in group:
+        c = _shopify_common(row)
+        c.update({"Seller SKU": row.get("sku"), "Total variation": "",
+                  "Variation 1": row.get("variant_value_1") or "",
+                  "Variation 2": _shopify_size(row.get("variant_value_2")),
+                  "Product Image URL(s)": IMG_SEP.join(_shopify_images(row))})
+        rows_out.append([c.get(h, "") for h in SHOPIFY_HEADERS_TOMS])
+    return rows_out
 
 
 HEADERS = {"shopee": SHOPEE_HEADERS, "lazada": LAZADA_HEADERS, "tiktok": TIKTOK_HEADERS,
-           "zalora": ZALORA_HEADERS, "shopify": SHOPIFY_HEADERS}
+           "zalora": ZALORA_HEADERS, "shopify": SHOPIFY_HEADERS_TOMS}
 
 
 def build_platform_rows(platform, rows):
     headers = HEADERS[platform]
-    if platform in ("shopee", "lazada"):
-        builder = build_shopee_group_rows if platform == "shopee" else build_lazada_group_rows
+    if platform in ("shopee", "lazada", "shopify"):
+        builder = {"shopee": build_shopee_group_rows, "lazada": build_lazada_group_rows,
+                   "shopify": build_shopify_group_rows}[platform]
         groups, order = {}, []
         for r in rows:
             k = _group_key(r, True)
@@ -336,10 +377,5 @@ def build_platform_rows(platform, rows):
         for k in order:
             out.extend(builder(groups[k]))
         return headers, out
-    if platform == "shopify":
-        groups = {}
-        for r in rows:
-            groups.setdefault(_group_key(r, True), []).append(r)
-        return headers, [build_shopify_row(r, groups[_group_key(r, True)]) for r in rows]
     builder = build_tiktok_row if platform == "tiktok" else build_zalora_row
     return headers, [builder(r) for r in rows]
