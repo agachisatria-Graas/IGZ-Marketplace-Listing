@@ -5,15 +5,17 @@ import image_combiner_ui
 import herschel_ui
 import toms_ui
 import hedgren_ui
+import allbirds_ui
 
 st.set_page_config(page_title="Agachi's Tools", layout="wide")
 
-tool_tab1, tool_tab2, tool_tab3, tool_tab4, tool_tab5 = st.tabs([
+tool_tab1, tool_tab2, tool_tab3, tool_tab4, tool_tab5, tool_tab6 = st.tabs([
     "📦 Hydro Flask Marketplace Listing Tool",
     "🖼️ Image Link Combiner",
     "🎒 Herschel Marketplace Listing Tool",
     "👟 Toms Marketplace Listing Tool",
     "👜 Hedgren Marketplace Listing Tool",
+    "🌿 Allbirds Marketplace Listing Tool",
 ])
 with tool_tab1:
     hydro_flask_ui.render()
@@ -25,6 +27,8 @@ with tool_tab4:
     toms_ui.render()
 with tool_tab5:
     hedgren_ui.render()
+with tool_tab6:
+    allbirds_ui.render()
 
 # To add a new brand: create <brand>_ui.py with its own raw-file loader,
 # category-mapping loader, and a render() function (copy an existing
