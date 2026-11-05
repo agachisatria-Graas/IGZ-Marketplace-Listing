@@ -92,6 +92,7 @@ def parse_masterfile(uploaded_file):
             "zalora_color_family": str(r.get("zalora_color_family") or "").title(),
             "zalora_color": r.get("variant_value_1"),
             "zalora_images": "",  # filled in by merge_images_into_rows()
+            "shopify_images": "",
             "season": r.get("season"),
             "year": r.get("year"),
         }
@@ -105,7 +106,7 @@ def load_images_workbook(uploaded_file):
     SKU + Combined Images columns. Returns (lazada_images, zalora_images),
     each a {sku_as_string: combined_images_string} dict."""
     sheets = pd.read_excel(uploaded_file, sheet_name=None, header=0)
-    lazada_images, zalora_images = {}, {}
+    lazada_images, zalora_images, shopify_images = {}, {}, {}
     for sheet_name, df in sheets.items():
         if df.shape[1] < 2:
             continue
@@ -114,6 +115,8 @@ def load_images_workbook(uploaded_file):
             target = lazada_images
         elif "zalora" in sheet_name.lower():
             target = zalora_images
+        elif "shopify" in sheet_name.lower():
+            target = shopify_images
         if target is None:
             continue
         for _, row in df.iterrows():
@@ -121,10 +124,10 @@ def load_images_workbook(uploaded_file):
             if pd.isna(sku):
                 continue
             target[str(sku).strip()] = "" if pd.isna(imgs) else str(imgs)
-    return lazada_images, zalora_images
+    return lazada_images, zalora_images, shopify_images
 
 
-def merge_images_into_rows(rows, lazada_images, zalora_images):
+def merge_images_into_rows(rows, lazada_images, zalora_images, shopify_images=None):
     """Fills parent_images (used by Shopee/Lazada/TikTok/Shopify) and
     zalora_images on each row, matched by SKU. Returns a new list of rows and
     the sorted list of SKUs that had no image match in either file (does not
@@ -138,7 +141,9 @@ def merge_images_into_rows(rows, lazada_images, zalora_images):
         zalora_imgs = zalora_images.get(sku, "")
         r2["parent_images"] = parent_imgs
         r2["zalora_images"] = zalora_imgs
-        if not parent_imgs and not zalora_imgs:
+        shopify_imgs = (shopify_images or {}).get(sku, "")
+        r2["shopify_images"] = shopify_imgs
+        if not parent_imgs and not zalora_imgs and not shopify_imgs:
             unmatched.append(sku)
         out.append(r2)
     return out, sorted(unmatched)

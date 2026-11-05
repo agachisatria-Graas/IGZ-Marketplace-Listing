@@ -344,11 +344,11 @@ def _render_masterfile_import_mode():
 
     if uploaded_images is not None:
         try:
-            lazada_images, zalora_images = hfm.load_images_workbook(uploaded_images)
+            lazada_images, zalora_images, shopify_images = hfm.load_images_workbook(uploaded_images)
         except Exception as e:
             st.error(f"Couldn't read the images file: {e}")
             st.stop()
-        raw_rows, unmatched_imgs = hfm.merge_images_into_rows(raw_rows, lazada_images, zalora_images)
+        raw_rows, unmatched_imgs = hfm.merge_images_into_rows(raw_rows, lazada_images, zalora_images, shopify_images)
         st.success(f"Matched images for {len(raw_rows) - len(unmatched_imgs)} / {len(raw_rows)} SKU(s).")
         if unmatched_imgs:
             with st.expander(f"⚠️ No images matched for {len(unmatched_imgs)} SKU(s)"):
